@@ -1,0 +1,1440 @@
+// ==========================================
+// 全局變數區 (只需宣告，值皆從試算表動態獲取)
+// ==========================================
+// 強制鎖定模型為 gemini-3-flash-preview
+const GEMINI_MODEL = "gemini-3-flash-preview";
+
+// ==========================================
+// API 進入點 1：GET 請求 (處理網頁顯示與 Meta Webhook 驗證)
+// ==========================================
+function doGet(e) {
+  // 1. Meta Webhook 驗證邏輯
+  if (e && e.parameter && e.parameter['hub.mode'] === 'subscribe' && e.parameter['hub.verify_token']) {
+    return ContentService.createTextOutput(e.parameter['hub.challenge']);
+  }
+  // 2. 網頁前端渲染邏輯
+  return HtmlService.createHtmlOutputFromFile('index')
+      .setTitle(getBotName() + ' | AI智能企業助理與戰略系統')
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
+}
+
+// ==========================================
+// 雙棲環境分流器 (支援前端 google.script.run 原生呼叫)
+// ==========================================
+function serverDispatcher(payload) {
+  const fakeEvent = { postData: { contents: JSON.stringify(payload) } };
+  const resOutput = doPost(fakeEvent);
+  return JSON.parse(resOutput.getContent());
+}
+
+// ==========================================
+// API 進入點 2：POST 請求 (處理網頁 API、LINE、Meta)
+// ==========================================
+function doPost(e) {
+  try {
+    const rawData = e.postData.contents;
+    const payload = JSON.parse(rawData);
+
+    // 路由 1：來自網頁前端的請求 (有 action 參數)
+    if (payload.action) {
+      let result = {};
+      switch (payload.action) {
+        case 'get_sys_config':
+          result = { botName: getBotName() };
+          break;
+        case 'verify_login':
+          const bossEmail = getBossEmail();
+          let role = (bossEmail !== "" && payload.email.toLowerCase().trim() === bossEmail.toLowerCase().trim()) ? 'boss' : 'client';
+          result = { email: payload.email, name: payload.name, role: role };
+          break;
+        case 'client_chat':
+          result = handleClientChat(payload);
+          break;
+        case 'send_admin_override':
+          result = handleAdminOverride(payload);
+          break;
+        case 'war_room_chat':
+          result = handleWarRoomChat(payload);
+          break;
+        case 'get_admin_data':
+          result = getAdminData();
+          break;
+        default:
+          result = { error: "未知的請求動作" };
+      }
+      // 嚴格落實 { status: "success", data: ... } 規範
+      const responsePayload = { status: "success", data: result };
+      return ContentService.createTextOutput(JSON.stringify(responsePayload))
+          .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // 路由 2：來自 LINE Webhook 的請求
+    if (payload.events && payload.destination) {
+      handleLineWebhook(payload.events);
+      return ContentService.createTextOutput(JSON.stringify({ status: "success", data: { processed: true } }))
+          .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // 路由 3：來自 Meta (Facebook/IG) Webhook 的請求
+    if (payload.object === 'page' || payload.object === 'instagram') {
+      handleMetaWebhook(payload.entry);
+      return ContentService.createTextOutput(JSON.stringify({ status: "success", data: { processed: true } }))
+          .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", error: "無法識別的 Webhook 來源" }))
+        .setMimeType(ContentService.MimeType.JSON);
+  } catch (error) {
+    console.error("doPost 發生異常：", error);
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", error: error.toString() }))
+        .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+// ==========================================
+// 全動態輔助功能：抓取 AI 助理名稱
+// ==========================================
+function getBotName() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("角色設定");
+  if (sheet) {
+    const data = sheet.getDataRange().getValues();
+    for (let i = 0; i < data.length; i++) {
+      const keyName = data[i][0].toString().trim();
+      if (keyName.includes("AI助理名稱") || keyName.includes("角色名稱") || keyName.includes("助理名稱")) {
+        if (data[i][1].toString().trim()) {
+          return data[i][1].toString().trim();
+        }
+      }
+    }
+  }
+  return "智能企業助理";
+}
+
+// ==========================================
+// 全動態輔助功能：抓取老闆 Email
+// ==========================================
+function getBossEmail() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("角色設定");
+  if (!sheet) return "";
+  const data = sheet.getDataRange().getValues();
+  for (let i = 0; i < data.length; i++) {
+    if (data[i][0].toString().trim() === "老闆自己個人Email帳號") {
+      return data[i][1].toString().trim();
+    }
+  }
+  return "";
+}
+
+// ==========================================
+// 核心處理中心：LINE Webhook 邏輯 (支援真實暱稱多重解析)
+// ==========================================
+function handleLineWebhook(events) {
+  const config = getDynamicConfig();
+  if (!config.lineToken) return;
+
+  const bossLineId = getSettingValue("老闆自己個人line聊天ID");
+
+  events.forEach(event => {
+    if (event.type === 'message') {
+      const userId = event.source.userId;
+      const replyToken = event.replyToken;
+      const message = event.message;
+      let text = "";
+      let fileObj = null;
+
+      // 傳入 event.source 進行群組/房間/一對一多層解析
+      let userName = getLineProfileName(userId, config.lineToken, event.source);
+
+      if (message.type === 'text') {
+        text = message.text;
+      } else if (['image', 'video', 'audio', 'file'].includes(message.type)) {
+        fileObj = fetchLineMedia(message.id, config.lineToken, message.type);
+      }
+
+      // 若原暱稱為假名或代碼，且用戶訊息中自報姓名，自動捕獲真實姓名
+      if (text) {
+        const extracted = extractNameFromMessage(text);
+        if (extracted && (!userName || userName.startsWith("LINE好友_") || userName.startsWith("Meta_User_"))) {
+          userName = extracted;
+          try {
+            CacheService.getScriptCache().put("LineProfileName_" + userId, userName, 21600);
+            CacheService.getScriptCache().put("UserNameSheet_" + userId, userName, 21600);
+          } catch(e) {}
+        }
+      }
+
+      if (text || fileObj) {
+        if (userId === bossLineId && text) {
+          saveBossFeedbackToOptimization(text);
+        }
+
+        const aiReply = processOmniChannelMessage(userId, userName, text, fileObj, config);
+       
+        if (aiReply && aiReply !== "__SILENT__") {
+          sendLineReply(replyToken, aiReply, config.lineToken);
+        }
+      }
+    }
+  });
+}
+
+// ==========================================
+// 核心處理中心：Meta (FB/IG) Webhook 邏輯
+// ==========================================
+function handleMetaWebhook(entries) {
+  const config = getDynamicConfig();
+  if (!config.metaToken) return;
+
+  entries.forEach(entry => {
+    if (entry.messaging) {
+      entry.messaging.forEach(event => {
+        if (event.message && !event.message.is_echo) {
+          const senderId = event.sender.id;
+          const message = event.message;
+          let text = message.text || "";
+          let fileObj = null;
+          let userName = getExistingUserNameFromSheet(senderId) || ("Meta_User_" + senderId.substring(0, 5));
+
+          if (message.attachments && message.attachments.length > 0) {
+            const attachment = message.attachments[0];
+            const url = attachment.payload.url;
+            if (url) {
+              fileObj = fetchMetaMedia(url, attachment.type);
+            }
+          }
+
+          if (text) {
+            const extracted = extractNameFromMessage(text);
+            if (extracted && userName.startsWith("Meta_User_")) {
+              userName = extracted;
+            }
+          }
+
+          if (text || fileObj) {
+            const aiReply = processOmniChannelMessage(senderId, userName, text, fileObj, config);
+           
+            if (aiReply && aiReply !== "__SILENT__") {
+              sendMetaReply(senderId, aiReply, config.metaToken);
+            }
+          }
+        }
+      });
+    }
+  });
+}
+
+// ==========================================
+// 判斷 AI 是否處於真人客服接管休眠期
+// ==========================================
+// ==========================================
+// 判斷 AI 是否處於真人客服接管休眠期 (已修正正則表達式與優化)
+// ==========================================
+function checkIfAiShouldSleep(userId) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("互動紀錄");
+  if (!sheet) return false;
+  const data = sheet.getDataRange().getDisplayValues();
+
+  for (let i = 1; i < data.length; i++) {
+    // 比對是否為該用戶
+    if (String(data[i][1]).trim() === String(userId).trim()) {
+      const row = data[i];
+      
+      // 從後面往前找對話紀錄，確認最新的狀態
+      for (let j = row.length - 1; j >= 8; j--) {
+        if (j % 2 !== 0 && row[j]) {
+          const replyMsg = String(row[j]).trim();
+          if (replyMsg === "") continue;
+          
+          if (replyMsg.includes("[真人客服]")) {
+            // 【修正重點】修正了原本未閉合的群組括號，正確分出 6 個群組：(年)-(月)-(日) (時):(分):(秒)
+            const match = replyMsg.match(/\[(\d{4})-(\d{2})-(\d{2})\s(\d{2}):(\d{2}):(\d{2})\]/);
+            
+            if (match) {
+              // 取出正則表達式擷取到的時間數據
+              const year = parseInt(match[1], 10);
+              const month = parseInt(match[2], 10) - 1; // JavaScript 的月份是 0-11，所以要減 1
+              const day = parseInt(match[3], 10);
+              const hour = parseInt(match[4], 10);
+              const min = parseInt(match[5], 10);
+              const sec = parseInt(match[6], 10);
+              
+              // 取得系統當下時間
+              const nowStr = Utilities.formatDate(new Date(), "GMT+8", "yyyy-MM-dd-HH-mm-ss");
+              const nParts = nowStr.split('-');
+              
+              // 將兩個時間轉換為毫秒 (Timestamp) 以便計算差值
+              const adminDate = new Date(year, month, day, hour, min, sec).getTime();
+              const nowDate = new Date(nParts[0], nParts[1] - 1, nParts[2], nParts[3], nParts[4], nParts[5]).getTime();
+              
+              // 計算時間差 (轉為小時)
+              const diffHours = (nowDate - adminDate) / (1000 * 60 * 60);
+              
+              // 如果真人介入小於 1 小時，AI 繼續休眠
+              return diffHours < 1;
+            }
+          } else if (replyMsg.includes("[系統紀錄：")) {
+            continue;
+          } else if (replyMsg.match(/\[\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}\]/)) {
+            // 這裡的正則表達式沒有括號擷取群組，語法是正確的
+            return false;
+          }
+        }
+      }
+      break;
+    }
+  }
+  return false;
+}
+
+// ==========================================
+// 終極大腦核心：全通路共用處理邏輯 (1.5秒極速抗併發防抖)
+// ==========================================
+function processOmniChannelMessage(userId, userName, text, fileObj, config, isClientTest = false) {
+  const cache = CacheService.getScriptCache();
+  const bufferKey = "MsgBuffer_" + userId;
+  const timeKey = "MsgTime_" + userId;    
+
+  let newTextChunk = text || "";
+  let mediaRecord = "";
+  let fileUrl = "";
+
+  if (fileObj && fileObj.base64) {
+    fileUrl = saveFileToDrive(fileObj, userId, config.mediaFolderId);
+    const isAiSleeping = checkIfAiShouldSleep(userId);
+    if (!isAiSleeping) {
+      mediaRecord = analyzeMediaWithGemini(fileObj, config.apiKeys);
+    } else {
+      mediaRecord = "AI靜默中，未執行多媒體解析。";
+    }
+    newTextChunk += `\n[系統通知：客戶上傳檔案] 網址：${fileUrl}\n[解析紀錄]：${mediaRecord}`;
+  }
+
+  // 輕量防抖鎖定 (逾時自動容錯，嚴禁全域掛死)
+  const cacheLock = LockService.getScriptLock();
+  try { cacheLock.waitLock(2000); } catch(e) {}
+
+  let currentBuffer = cache.get(bufferKey) || "";
+  let combinedMessage = currentBuffer ? (currentBuffer + "\n" + newTextChunk) : newTextChunk;
+  cache.put(bufferKey, combinedMessage, 300);
+
+  const myThreadId = new Date().getTime().toString() + "_" + Math.random().toString(36).substring(2, 9);
+  cache.put(timeKey, myThreadId, 300);
+
+  try { cacheLock.releaseLock(); } catch(e) {}
+  Utilities.sleep(1500);
+
+  const latestThreadId = cache.get(timeKey);
+  if (latestThreadId !== myThreadId) {
+    return "__SILENT__";
+  }
+
+  try { cacheLock.waitLock(2000); } catch(e) {}
+  let finalClientMessage = cache.get(bufferKey) || combinedMessage;
+  cache.remove(bufferKey);
+  cache.remove(timeKey);
+  try { cacheLock.releaseLock(); } catch(e) {}
+
+  const isAiSleeping = checkIfAiShouldSleep(userId);
+  if ((!config.apiKeys || config.apiKeys.length === 0) && !isAiSleeping) {
+    return "系統未設定 Gemini API Key，請聯繫管理員。";
+  }
+
+  if (isAiSleeping) {
+    const silentPlaceholder = "[系統紀錄：真人接管中，AI休眠1小時暫停自動回覆]";
+    saveToSheet(userId, userName, finalClientMessage, silentPlaceholder);
+    return "__SILENT__";
+  }
+
+  const chatHistory = getUserHistory(userId);
+  const systemPrompt = buildSystemPrompt(userName, userId, isClientTest);
+
+  // 傳入 20 組 API Key 池進行動態順序輪調、熔斷容錯與調用次數即時紀錄
+  let aiReply = generateAiResponse(systemPrompt, chatHistory, finalClientMessage, config.apiKeys);
+
+  const bookingRegex = /\[(?:NEW|UPDATE)_CALENDAR_FULL:\s*({.*?})\]/gs;
+  const matches = [...aiReply.matchAll(bookingRegex)];
+  if (matches.length > 0) {
+    for (const match of matches) {
+      try {
+        const bookingData = JSON.parse(match[1]);
+        const bookingMsg = processBooking(userId, bookingData.date, bookingData.time, bookingData.service);
+        console.log("📅 AI排程/預約觸發結果：" + bookingMsg);
+      } catch (e) {
+        console.error("解析預約 JSON 指令失敗：", e);
+      }
+    }
+    aiReply = aiReply.replace(bookingRegex, "").trim();
+  }
+
+  aiReply = aiReply.replace(/\*\*/g, "").replace(/#{1,3}\s?/g, "");
+
+  // 存入互動紀錄工作表，並同步驗證與更新真實姓名
+  saveToSheet(userId, userName, finalClientMessage, aiReply);
+
+  return aiReply;
+}
+
+// ==========================================
+// 網頁前端專用：串接核心大腦
+// ==========================================
+function handleClientChat(payload) {
+  const config = getDynamicConfig();
+  const aiReply = processOmniChannelMessage(payload.email, payload.name, payload.text, payload.fileObj, config, true);
+  if (aiReply === "__SILENT__") {
+    return { reply: "", isSilent: true };
+  }
+  return { reply: aiReply };
+}
+
+// ==========================================
+// 核心功能：老闆戰情室 (最高機密分析)
+// ==========================================
+function handleWarRoomChat(payload) {
+  const { userMessage, fileObj } = payload;
+  let finalMsg = userMessage || "";
+  let mediaRecord = "";
+  const config = getDynamicConfig();
+  if (!config.apiKeys || config.apiKeys.length === 0) throw new Error("尚未設定 Gemini API Key");
+
+  if (fileObj && fileObj.base64) {
+    mediaRecord = analyzeMediaWithGemini(fileObj, config.apiKeys);
+    finalMsg += `\n\n[老闆上傳之檔案解析]：\n${mediaRecord}`;
+  }
+
+  const systemPrompt = `你是企業戰情室的高階戰略顧問，服務對象是老闆。\n` +
+  `請根據老闆的指令提供深刻、具備商業洞察力的分析與決策建議。請使用有條理的排版與換行。\n` +
+  `(可輔助參考本系統中的所有知識館藏與收支記帳精神)`;
+
+  let aiReply = generateAiResponse(systemPrompt, "【內部機密環境，無客戶對話紀錄】", finalMsg, config.apiKeys);
+  return { reply: aiReply };
+}
+
+// ==========================================
+// 核心功能：系統監控台 - 真人強制接管
+// ==========================================
+function handleAdminOverride(payload) {
+  const { userId, text, _rowId } = payload;
+  const config = getDynamicConfig();
+  if (userId) {
+    const userIdStr = String(userId).trim();
+   
+    if (userIdStr.startsWith("U") && userIdStr.length === 33) {
+      if (config.lineToken) {
+        sendLinePush(userIdStr, text, config.lineToken);
+      } else {
+        console.warn("無法發送 LINE 訊息：參數設定中找不到 lineToken");
+      }
+    } else if (/^\d+$/.test(userIdStr)) {
+      if (config.metaToken) {
+        sendMetaReply(userIdStr, text, config.metaToken);
+      } else {
+        console.warn("無法發送 Meta 訊息：參數設定中找不到 metaToken");
+      }
+    }
+  }
+
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000);
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("互動紀錄");
+    if (!sheet) return { status: "error", msg: "找不到互動紀錄工作表" };
+
+    const data = sheet.getDataRange().getValues();
+    const timestamp = Utilities.formatDate(new Date(), "GMT+8", "yyyy-MM-dd HH:mm:ss");
+    const formattedAdminReply = `[${timestamp}]\n[真人客服]${text}`;
+
+    let targetRow = -1;
+    if (_rowId && _rowId > 1 && _rowId <= data.length && data[_rowId - 1][1] === userId) {
+      targetRow = _rowId;
+    } else {
+      for (let i = 1; i < data.length; i++) {
+        if (data[i][1] === userId) {
+          targetRow = i + 1;
+          break;
+        }
+      }
+    }
+
+    if (targetRow !== -1) {
+      let insertCol = 8;
+      let foundSpot = false;
+
+      while (insertCol < sheet.getMaxColumns()) {
+        let clientVal = sheet.getRange(targetRow, insertCol + 1).getValue();
+        let aiVal = sheet.getRange(targetRow, insertCol + 2).getValue();
+
+        if (clientVal && !aiVal) {
+          sheet.getRange(targetRow, insertCol + 2).setValue(formattedAdminReply);
+          foundSpot = true;
+          break;
+        } else if (!clientVal && !aiVal) {
+          sheet.getRange(targetRow, insertCol + 1).setValue(`[${timestamp}]\n[系統提示：真人主動介入聯繫]`);
+          sheet.getRange(targetRow, insertCol + 2).setValue(formattedAdminReply);
+          foundSpot = true;
+          break;
+        }
+        insertCol += 2;
+      }
+     
+      if (!foundSpot) {
+        sheet.getRange(targetRow, insertCol + 1).setValue(`[${timestamp}]\n[系統提示：真人主動介入聯繫]`);
+        sheet.getRange(targetRow, insertCol + 2).setValue(formattedAdminReply);
+      }
+      SpreadsheetApp.flush();
+    }
+  } catch (error) {
+    console.error("寫入試算表時發生排隊超時或衝突：", error);
+  } finally {
+    try { lock.releaseLock(); } catch(e) {}
+  }
+  return { status: "success" };
+}
+
+// ==========================================
+// 外部 API 串接：LINE 主動推播工具
+// ==========================================
+function sendLinePush(userId, text, lineToken) {
+  const url = "https://api.line.me/v2/bot/message/push";
+  const payload = {
+    to: userId,
+    messages: [{ type: "text", text: text }]
+  };
+  try {
+    const response = UrlFetchApp.fetch(url, {
+      method: "post",
+      headers: {
+        "Authorization": `Bearer ${lineToken}`,
+        "Content-Type": "application/json"
+      },
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    });
+    console.log("LINE 主動推播回應狀態：" + response.getResponseCode());
+  } catch (error) {
+    console.error("LINE 主動推播發送失敗：", error);
+  }
+}
+
+// ==========================================
+// 後端讀取：注入 _rowId 生死線與結構化資料包裝
+// ==========================================
+function getAdminData() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("互動紀錄");
+  if (!sheet) return { users: [], histories: {} };
+  const data = sheet.getDataRange().getDisplayValues();
+  const users = [];
+  const histories = {};
+
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    const email = row[1];
+    if (!email) continue;
+   
+    const name = row[2];
+    const bookingState = row[5] ? 'completed' : (row[3] ? 'booked' : 'none');
+
+    // 強制注入 _rowId = i + 1
+    users.push({
+      _rowId: i + 1,
+      userId: email,
+      userName: name,
+      bookingState: bookingState,
+      isUrgent: false,
+      labels: [row[4] ? "有預約需求" : "潛在名單"]
+    });
+
+    const history = [];
+    for (let col = 8; col < row.length; col += 2) {
+      const clientMsg = row[col];
+      const aiMsg = row[col+1];
+     
+      if (clientMsg) history.push({ sender: 'client', text: clientMsg });
+      if (aiMsg) {
+        if (aiMsg.includes("[真人客服]")) {
+          history.push({ sender: 'admin', text: aiMsg });
+        } else {
+          history.push({ sender: 'ai', text: aiMsg });
+        }
+      }
+    }
+    histories[email] = history;
+  }
+  return { users: users, histories: histories };
+}
+
+// ==========================================
+// 動態讀取機制：獲取全部 20 組 API Key 池（依編號自然排序）與 Tokens
+// ==========================================
+function getDynamicConfig() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("參數設定");
+  let mediaFolderId = "";
+  let apiKeys = [];
+  let lineToken = "";
+  let metaToken = "";
+
+  if (sheet) {
+    const data = sheet.getDataRange().getValues();
+    for (let i = 0; i < data.length; i++) {
+      let keyName = data[i][0].toString().trim();
+      let val = data[i][1].toString().trim();
+     
+      if (keyName === "多媒體儲存調用區Google Drive" && val) {
+        const match = val.match(/folders\/([a-zA-Z0-9_-]+)/);
+        if (match) mediaFolderId = match[1];
+      }
+      
+      const cleanKey = keyName.toUpperCase().replace(/\s+/g, '');
+      if ((cleanKey.includes("GEMINI_API_KEY") || cleanKey === "API_KEY") && val && !val.includes("已被調用") && !val.includes("API_KEY")) {
+        apiKeys.push({
+          name: keyName,
+          key: val,
+          rowIndex: i + 1, // 試算表中實際行號 (1-indexed)
+          usageInfo: data[i][2] ? data[i][2].toString().trim() : ""
+        });
+      }
+      if (keyName.toLowerCase().includes("line") && keyName.toLowerCase().includes("token") && val) {
+        lineToken = val;
+      }
+      if (keyName.toLowerCase().includes("meta") && keyName.toLowerCase().includes("token") && val) {
+        metaToken = val;
+      }
+    }
+  }
+
+  // 🎯 關鍵順序優化：嚴格依據 Key 編號進行自然數字排序 (1 -> 2 -> ... -> 20)
+  apiKeys.sort((a, b) => {
+    const numA = parseInt((a.name.match(/\d+/) || [0])[0], 10);
+    const numB = parseInt((b.name.match(/\d+/) || [0])[0], 10);
+    if (numA && numB) return numA - numB;
+    return a.rowIndex - b.rowIndex;
+  });
+
+  return { mediaFolderId, apiKeys: apiKeys, lineToken, metaToken };
+}
+
+// ==========================================
+// 🚀 核心大腦 API：20 組 Key 原子級順序輪調與排隊引擎
+// ==========================================
+function getRotatedApiKey(apiKeys) {
+  if (!apiKeys || apiKeys.length === 0) return null;
+  const cache = CacheService.getScriptCache();
+  
+  // 使用 ScriptLock 確保高併發時指針原子性累加，杜絕競爭踩踏
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(1000);
+  } catch (e) {}
+
+  let currentIndex = parseInt(cache.get("Gemini_RoundRobin_Index") || "0", 10);
+  if (isNaN(currentIndex)) currentIndex = 0;
+
+  const totalKeys = apiKeys.length;
+  let chosenKeyObj = null;
+
+  // 依序往前尋找未在 429 熔斷冷卻期中的金鑰
+  for (let step = 0; step < totalKeys; step++) {
+    const candidateIdx = (currentIndex + step) % totalKeys;
+    const item = apiKeys[candidateIdx];
+    const keyStr = typeof item === 'object' ? item.key : item;
+    const keyHash = Utilities.base64Encode(Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, keyStr)).substring(0, 8);
+    const isCooldown = cache.get("KeyCooldown_" + keyHash);
+
+    if (!isCooldown) {
+      // 成功選定，全域指針遞增指向下一個順位
+      const nextIndex = (candidateIdx + 1) % totalKeys;
+      cache.put("Gemini_RoundRobin_Index", nextIndex.toString(), 21600);
+      
+      chosenKeyObj = {
+        key: keyStr,
+        hash: keyHash,
+        index: candidateIdx,
+        name: typeof item === 'object' ? item.name : `Gemini_API_KEY_${candidateIdx + 1}`,
+        rowIndex: typeof item === 'object' ? item.rowIndex : null
+      };
+      break;
+    }
+  }
+
+  // 若極端狀況下所有 Key 皆冷卻中，強制取當前指標做兜底嘗試
+  if (!chosenKeyObj) {
+    const fallbackIdx = currentIndex % totalKeys;
+    const nextIndex = (fallbackIdx + 1) % totalKeys;
+    cache.put("Gemini_RoundRobin_Index", nextIndex.toString(), 21600);
+    const fallbackItem = apiKeys[fallbackIdx];
+    const fallbackKeyStr = typeof fallbackItem === 'object' ? fallbackItem.key : fallbackItem;
+    const fallbackHash = Utilities.base64Encode(Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, fallbackKeyStr)).substring(0, 8);
+    chosenKeyObj = {
+      key: fallbackKeyStr,
+      hash: fallbackHash,
+      index: fallbackIdx,
+      name: typeof fallbackItem === 'object' ? fallbackItem.name : `Gemini_API_KEY_${fallbackIdx + 1}`,
+      rowIndex: typeof fallbackItem === 'object' ? fallbackItem.rowIndex : null
+    };
+  }
+
+  try {
+    lock.releaseLock();
+  } catch (e) {}
+
+  return chosenKeyObj;
+}
+
+function markKeyCooldown(keyHash, seconds) {
+  try {
+    const cache = CacheService.getScriptCache();
+    cache.put("KeyCooldown_" + keyHash, "429_COOLDOWN", seconds);
+    console.warn(`⚠️ API Key [${keyHash}] 觸發配額上限，暫時隔離 ${seconds} 秒`);
+  } catch (e) {}
+}
+
+// 🎯 核心新增：在「參數設定」C 欄精確寫入調用次數、健康狀態與最新時間戳記
+function recordApiKeyUsage(keyObj, statusText, isError = false) {
+  if (!keyObj || !keyObj.rowIndex) return;
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("參數設定");
+    if (!sheet) return;
+
+    const cache = CacheService.getScriptCache();
+    const countKey = "KeyCallCount_" + keyObj.rowIndex;
+    let callCount = parseInt(cache.get(countKey), 10);
+
+    if (isNaN(callCount)) {
+      const existingVal = sheet.getRange(keyObj.rowIndex, 3).getValue().toString();
+      const match = existingVal.match(/(?:調用次數[:：]?\s*|累計調用\s*)(\d+)/i) || existingVal.match(/(\d+)\s*次/);
+      callCount = match ? parseInt(match[1], 10) : 0;
+    }
+
+    callCount += 1;
+    cache.put(countKey, callCount.toString(), 21600);
+
+    const timestamp = Utilities.formatDate(new Date(), "GMT+8", "yyyy-MM-dd HH:mm:ss");
+    const statusIcon = isError ? "⚠️ " : "✅ ";
+    const recordText = `調用次數: ${callCount} 次 | ${statusIcon}${statusText} | 最近: ${timestamp}`;
+
+    sheet.getRange(keyObj.rowIndex, 3).setValue(recordText);
+  } catch (e) {
+    console.warn(`記錄 API Key [${keyObj.name || keyObj.rowIndex}] 使用狀況失敗:`, e);
+  }
+}
+
+function generateAiResponse(systemPrompt, chatHistory, newClientMessage, apiKeys) {
+  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+  const finalPrompt = `\n${systemPrompt}\n---\n${chatHistory}\n---\n【最新訊息】：\n${newClientMessage}\n\n請根據上述指引回覆：`;
+
+  const payload = { contents: [{ parts: [{ text: finalPrompt }] }] };
+
+  let keysPool = Array.isArray(apiKeys) ? [...apiKeys] : [apiKeys];
+  keysPool = keysPool.filter(k => !!k);
+  if (keysPool.length === 0) return "系統未配置有效的 Gemini API Key。";
+
+  // 最多嘗試輪調切換 5 次，遇 429 即刻 Failover 到下一組順位 Key
+  const maxAttempts = Math.min(keysPool.length, 5);
+  const attemptedHashes = new Set();
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const keyObj = getRotatedApiKey(keysPool);
+    if (!keyObj || attemptedHashes.has(keyObj.hash)) {
+      continue;
+    }
+
+    attemptedHashes.add(keyObj.hash);
+    const options = {
+      method: "post",
+      contentType: "application/json",
+      headers: { "x-goog-api-key": keyObj.key },
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    };
+
+    try {
+      const response = UrlFetchApp.fetch(apiUrl, options);
+      const statusCode = response.getResponseCode();
+      const contentText = response.getContentText();
+
+      if (statusCode === 200) {
+        const json = JSON.parse(contentText);
+        if (json.candidates && json.candidates.length > 0 && json.candidates[0].content && json.candidates[0].content.parts) {
+          // 寫入成功調用紀錄
+          recordApiKeyUsage(keyObj, "正常回應", false);
+          return json.candidates[0].content.parts[0].text;
+        }
+      } else if (statusCode === 429 || statusCode === 503) {
+        markKeyCooldown(keyObj.hash, 45);
+        recordApiKeyUsage(keyObj, "429 配額超載暫時隔離 45 秒", true);
+        console.warn(`第 ${attempt + 1} 次嘗試 Key (${keyObj.name}) 觸發 HTTP ${statusCode}，立即啟用下一把備援 Key。`);
+        Utilities.sleep(200);
+      } else {
+        recordApiKeyUsage(keyObj, `HTTP ${statusCode} 異常回應`, true);
+        console.warn(`Gemini 回傳狀態碼 HTTP ${statusCode}: ${contentText.substring(0, 120)}`);
+      }
+    } catch (error) {
+      recordApiKeyUsage(keyObj, `網路呼叫例外: ${error.toString().substring(0, 25)}`, true);
+      console.error(`Gemini API 請求例外 (第 ${attempt + 1} 次)：`, error);
+      markKeyCooldown(keyObj.hash, 15);
+    }
+  }
+
+  return "親愛的，馨馨剛剛網路稍微打結了一下，請再跟我說一次好嗎？🌿";
+}
+
+// ==========================================
+// 輔助功能：精確抓取與更新用戶真實姓名
+// ==========================================
+function getExistingUserNameFromSheet(userId) {
+  if (!userId) return "";
+  const cache = CacheService.getScriptCache();
+  const cached = cache.get("UserNameSheet_" + userId);
+  if (cached && !cached.startsWith("LINE好友_") && !cached.startsWith("Meta_User_")) {
+    return cached;
+  }
+
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("互動紀錄");
+  if (!sheet) return "";
+  const lastRow = sheet.getLastRow();
+  if (lastRow <= 1) return "";
+
+  const data = sheet.getRange(2, 2, lastRow - 1, 2).getValues();
+  for (let i = 0; i < data.length; i++) {
+    if (String(data[i][0]).trim() === String(userId).trim()) {
+      const storedName = String(data[i][1]).trim();
+      if (storedName && !storedName.startsWith("LINE好友_") && !storedName.startsWith("Meta_User_") && storedName !== "智能企業助理") {
+        try { cache.put("UserNameSheet_" + userId, storedName, 21600); } catch(e) {}
+        return storedName;
+      }
+    }
+  }
+  return "";
+}
+
+function extractNameFromMessage(text) {
+  if (!text) return null;
+  const patterns = [
+    /(?:我叫|我是|我的名字是|敝姓)\s*([^\s,，。！？!?;；\n]{2,12})/i,
+    /(?:貴賓稱呼|客戶稱呼|姓名|稱呼|名字)[：:\s]+([^\s,，。！？!?;；\n]{2,12})/i
+  ];
+  for (let i = 0; i < patterns.length; i++) {
+    const m = text.match(patterns[i]);
+    if (m && m[1]) {
+      const nameCand = m[1].trim().replace(/[\[\]\(\)]/g, "");
+      const invalidWords = ["想", "要", "看", "問", "做", "買", "一個", "一位", "大家", "誰", "寶貝", "保養品", "微代謝", "加盟", "店家", "系統", "大腦", "測試"];
+      if (!invalidWords.some(w => nameCand.includes(w)) && nameCand.length >= 2) {
+        return nameCand;
+      }
+    }
+  }
+  return null;
+}
+
+function getLineProfileName(userId, lineToken, source) {
+  if (!userId || !lineToken) return "LINE好友";
+
+  const cache = CacheService.getScriptCache();
+  const cacheKey = "LineProfileName_" + userId;
+  const cached = cache.get(cacheKey);
+  if (cached && !cached.startsWith("LINE好友_") && !cached.startsWith("Meta_User_") && cached !== "智能企業助理") {
+    return cached;
+  }
+
+  const existingName = getExistingUserNameFromSheet(userId);
+  if (existingName && !existingName.startsWith("LINE好友_") && !existingName.startsWith("Meta_User_") && existingName !== "智能企業助理") {
+    try { cache.put(cacheKey, existingName, 21600); } catch(e) {}
+    return existingName;
+  }
+
+  const urls = [];
+  if (source && source.groupId) {
+    urls.push(`https://api.line.me/v2/bot/group/${source.groupId}/member/${userId}`);
+  }
+  if (source && source.roomId) {
+    urls.push(`https://api.line.me/v2/bot/room/${source.roomId}/member/${userId}`);
+  }
+  urls.push(`https://api.line.me/v2/bot/profile/${userId}`);
+
+  for (let i = 0; i < urls.length; i++) {
+    try {
+      const response = UrlFetchApp.fetch(urls[i], {
+        headers: { "Authorization": `Bearer ${lineToken}` },
+        muteHttpExceptions: true
+      });
+      const status = response.getResponseCode();
+      if (status === 200) {
+        const profile = JSON.parse(response.getContentText());
+        if (profile && profile.displayName) {
+          const realName = profile.displayName.trim();
+          try { cache.put(cacheKey, realName, 21600); } catch(e) {}
+          return realName;
+        }
+      }
+    } catch (e) {
+      console.warn(`LINE Profile API [${urls[i]}] 抓取異常:`, e);
+    }
+  }
+
+  return "LINE好友_" + userId.substring(0, 5);
+}
+
+// 帶有快取的單一工作表字串讀取 (快取 10 分鐘)
+function getSheetDataAsText(sheetName) {
+  const cache = CacheService.getScriptCache();
+  const cacheKey = "SheetDataText_" + encodeURIComponent(sheetName);
+  const cached = cache.get(cacheKey);
+  if (cached) return cached;
+
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+  if (!sheet) return "無此資料";
+  const data = sheet.getDataRange().getDisplayValues();
+  if (data.length === 0) return "無資料";
+  const result = data.map(row => row.join(" | ")).join("\n");
+  try {
+    cache.put(cacheKey, result.substring(0, 95000), 600);
+  } catch (e) {}
+  return result;
+}
+
+// 帶有快取的動態「知識館藏」讀取 (快取 10 分鐘)
+function getAllKnowledgeBaseData() {
+  const cache = CacheService.getScriptCache();
+  const cacheKey = "AllKnowledgeBaseData";
+  const cached = cache.get(cacheKey);
+  if (cached) return cached;
+
+  const sheets = SpreadsheetApp.getActiveSpreadsheet().getSheets();
+  let allKnowledgeData = "";
+
+  for (let i = 0; i < sheets.length; i++) {
+    let sheetName = sheets[i].getName();
+    if (sheetName.includes("知識館藏")) {
+      const data = sheets[i].getDataRange().getDisplayValues();
+      if (data.length > 0) {
+        allKnowledgeData += `\n[文獻來源工作表：${sheetName}]\n`;
+        allKnowledgeData += data.map(row => row.join(" | ")).join("\n") + "\n";
+      }
+    }
+  }
+  const result = allKnowledgeData || "無知識館藏資料";
+  try {
+    cache.put(cacheKey, result.substring(0, 95000), 600);
+  } catch (e) {}
+  return result;
+}
+
+// ==========================================
+// 系統 Prompt 組裝核心
+// ==========================================
+function buildSystemPrompt(userName, userId, isClientTest) {
+  const currentDateTime = Utilities.formatDate(new Date(), "GMT+8", "yyyy-MM-dd HH:mm:ss");
+  const bossEmail = getBossEmail().toLowerCase().trim();
+  const bossLineId = getSettingValue("老闆自己個人line聊天ID").toLowerCase().trim();
+  const currentId = String(userId).toLowerCase().trim();
+
+  const isBoss = !isClientTest && (currentId !== "" && (currentId === bossEmail || currentId === bossLineId));
+
+  let prompt = `【重要系統時間資訊】：現在的台灣時間是 ${currentDateTime}\n\n`;
+  if (isBoss) {
+    prompt += `你現在是這家公司的「老闆專屬秘書與高階特助」。你的直接服務對象是創辦人/老闆本人（${userName}）。\n`;
+    prompt += `請以專業、貼心、高效率的幕僚語氣與老闆對話，協助處理戰略分析、日常排程、營運管理，並直接執行老闆下達的指令。\n\n`;
+  } else {
+    prompt += `你現在是這家公司的「專業企業智能客服」。你的對話對象是一般客戶或潛在學員（${userName}）。\n`;
+    prompt += `請以溫暖、專業、具引導性的語氣與客戶對話，解答疑問並協助預約或成交。絕對不可對客戶自稱秘書或特助。\n\n`;
+  }
+  prompt += `🚨【最高優先級絕對指令：優化經驗】\n`;
+  prompt += `以下是老闆過去的指導與前車之鑑。請你「最優先」以此作為判別與回覆的絕對根據，絕不可違反任何一項：\n`;
+  prompt += `${getSheetDataAsText("優化經驗")}\n\n`;
+  prompt += `接著，請你嚴格參照以下我們公司的營運手冊與知識庫來建構回覆，展現高度智能與人性化：\n\n`;
+  prompt += `【一、角色設定】\n${getSheetDataAsText("角色設定")}\n\n`;
+  prompt += `【二、引導步驟】\n${getSheetDataAsText("引導步驟")}\n\n`;
+  prompt += `【三、應推策略】\n${getSheetDataAsText("應對策略")}\n\n`;
+  prompt += `【四、商品介紹與報價】\n${getSheetDataAsText("商品介紹與報價")}\n\n`;
+  prompt += `【五、龐大的知識庫與最新消息】\n${getAllKnowledgeBaseData()}\n\n`;
+  prompt += `🚨【系統基本規範】：\n`;
+  prompt += `1. 絕對不要提到你是 AI 語言模型，請完全沉浸在上述設定的角色中。\n`;
+  prompt += `2. 【禁用 Markdown 語法】：回覆的文字絕對禁止使用 Markdown 符號（例如：**粗體**、### 標題、# 符號）。請像真人用 LINE 聊天一樣，只用純文字、換行、或者數字 1. 2. 3. 來排版，維持溫暖且乾淨的對話質感。\n`;
+
+  if (isBoss) {
+    prompt += `3. 【秘書專屬排程指令】：當老闆要求你「安排行程」、「記錄到日曆」或「幫我排會」時，請務必在回覆最下方產生 [NEW_CALENDAR_FULL: {"date":"YYYY-MM-DD", "time":"HH:mm-HH:mm", "service":"老闆指示的行程名稱與備註"}] 格式的 JSON 指令。請務必運用「現在時間」精確推算日期。\n`;
+  } else {
+    prompt += `3. 【客服預約觸發器】：當符合「應對策略」中的「確定預訂」情境（客戶同意預約並提供完整資訊）時，務必在回覆最下方產生 [NEW_CALENDAR_FULL: {"date":"YYYY-MM-DD", "time":"HH:mm-HH:mm", "service":"預約服務名稱"}] 格式的 JSON 指令。\n`;
+  }
+  prompt += `4. 你的回應文字請盡量換行，讓閱讀舒服。\n`;
+  return prompt;
+}
+
+function getUserHistory(email) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("互動紀錄");
+  if (!sheet) return "";
+  const data = sheet.getDataRange().getDisplayValues();
+  let historyText = "";
+
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][1] === email) {
+      let row = data[i];
+      for(let j = 8; j < row.length; j+=2) {
+        if(row[j]) historyText += `客戶說：\n${row[j]}\n`;
+        if(row[j+1]) historyText += `AI/系統回覆：\n${row[j+1]}\n\n`;
+      }
+      break;
+    }
+  }
+  return historyText ? `【以下是歷史對話上下文】\n${historyText}` : "【這是新客戶】";
+}
+
+// ==========================================
+// 檔案處理與儲存區
+// ==========================================
+function saveFileToDrive(fileObj, email, folderId) {
+  try {
+    if (!folderId) return "未設定存檔資料夾";
+    const folder = DriveApp.getFolderById(folderId);
+    const decodedFile = Utilities.base64Decode(fileObj.base64);
+    const timeStr = Utilities.formatDate(new Date(), "GMT+8", "yyyyMMdd_HHmmss");
+    const newFileName = `${timeStr}_${email}_${fileObj.fileName}`;
+    const blob = Utilities.newBlob(decodedFile, fileObj.mimeType, newFileName);
+    const file = folder.createFile(blob);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    return file.getUrl();
+  } catch (error) {
+    console.error("檔案儲存失敗", error);
+    return "檔案儲存失敗";
+  }
+}
+
+function analyzeMediaWithGemini(fileObj, apiKeys) {
+  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+  const prompt = `你是一個專業的內容解析助理。請針對此多媒體檔案進行深度解析：\n1. 若為圖片，請詳細描述畫面內容、文字與情境。\n2. 若為影片，請盡量以每10秒為單位描述一次畫面，並附上語音逐字稿。\n3. 若為音檔，請提供完整的語音逐字稿與情緒語氣分析。`;
+
+  const payload = {
+    contents: [{ parts: [{ text: prompt }, { inlineData: { mimeType: fileObj.mimeType, data: fileObj.base64 } }] }]
+  };
+
+  let keysPool = Array.isArray(apiKeys) ? [...apiKeys] : [apiKeys];
+  keysPool = keysPool.filter(k => !!k);
+  if (keysPool.length === 0) return "未設定 API Key，無法解析多媒體。";
+
+  for (let attempt = 0; attempt < Math.min(keysPool.length, 3); attempt++) {
+    const keyObj = getRotatedApiKey(keysPool);
+    const currentKey = keyObj ? keyObj.key : keysPool[attempt];
+    const options = {
+      method: "post",
+      contentType: "application/json",
+      headers: { "x-goog-api-key": currentKey },
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    };
+
+    try {
+      const response = UrlFetchApp.fetch(apiUrl, options);
+      if (response.getResponseCode() === 200) {
+        const json = JSON.parse(response.getContentText());
+        if (json.candidates && json.candidates.length > 0) {
+          recordApiKeyUsage(keyObj, "多媒體解析成功", false);
+          return json.candidates[0].content.parts[0].text;
+        }
+      } else {
+        recordApiKeyUsage(keyObj, `多媒體解析 HTTP ${response.getResponseCode()}`, true);
+      }
+    } catch (error) {
+      recordApiKeyUsage(keyObj, `多媒體解析例外: ${error.toString().substring(0, 25)}`, true);
+      console.error("多媒體解析例外：", error);
+    }
+  }
+  return "無法辨識檔案內容或服務忙碌中。";
+}
+
+// ==========================================
+// 併發安全版：試算表寫入機制 (姓名自動補正與防覆蓋)
+// ==========================================
+function saveToSheet(email, name, clientMessage, aiReply) {
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000);
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("互動紀錄");
+    if (!sheet) return;
+
+    const timestamp = Utilities.formatDate(new Date(), "GMT+8", "yyyy-MM-dd HH:mm:ss");
+    const formattedClientMsg = `[${timestamp}]\n${clientMessage}`;
+    const formattedAiMsg = `[${timestamp}]\n${aiReply}`;
+
+    // 智能提取對話中的真實姓名補正
+    const extractedName = extractNameFromMessage(clientMessage);
+    let resolvedName = name;
+    if (extractedName && (!resolvedName || resolvedName.startsWith("LINE好友_") || resolvedName.startsWith("Meta_User_"))) {
+      resolvedName = extractedName;
+      try {
+        CacheService.getScriptCache().put("LineProfileName_" + email, resolvedName, 21600);
+        CacheService.getScriptCache().put("UserNameSheet_" + email, resolvedName, 21600);
+      } catch(e) {}
+    }
+
+    const data = sheet.getDataRange().getValues();
+    const userRowIndexIndex = data.slice(1).findIndex(row => String(row[1]).trim() === String(email).trim());
+   
+    if (userRowIndexIndex === -1) {
+      sheet.appendRow([timestamp, email, resolvedName, "", "", "", "", "", formattedClientMsg, formattedAiMsg]);
+    } else {
+      const actualRowIndex = userRowIndexIndex + 2;
+      const rowData = data[actualRowIndex - 1];
+
+      // 若資料表目前的姓名是代碼/預設值，且本次有取得真實姓名，立即覆蓋修正 C 欄！
+      const currentStoredName = String(rowData[2] || "").trim();
+      const isFallbackStored = currentStoredName === "" || currentStoredName.startsWith("LINE好友_") || currentStoredName.startsWith("Meta_User_") || currentStoredName === "智能企業助理" || currentStoredName === "LINE用戶";
+      const isResolvedValid = resolvedName && !resolvedName.startsWith("LINE好友_") && !resolvedName.startsWith("Meta_User_") && resolvedName !== "智能企業助理" && resolvedName !== "LINE用戶";
+
+      if (isFallbackStored && isResolvedValid) {
+        sheet.getRange(actualRowIndex, 3).setValue(resolvedName);
+      }
+     
+      let insertCol = 8;
+      while (insertCol < rowData.length && rowData[insertCol] !== "") {
+        insertCol += 2;
+      }
+     
+      sheet.getRange(actualRowIndex, insertCol + 1, 1, 2).setValues([[formattedClientMsg, formattedAiMsg]]);
+    }
+   
+    SpreadsheetApp.flush();
+  } catch (error) {
+    console.error("寫入試算表時發生衝突：", error);
+  } finally {
+    try { lock.releaseLock(); } catch(e) {}
+  }
+}
+
+// ==========================================
+// 外部 API 串接：LINE 與 Meta 取檔及回覆工具
+// ==========================================
+function fetchLineMedia(messageId, lineToken, type) {
+  try {
+    const url = `https://api-data.line.me/v2/bot/message/${messageId}/content`;
+    const response = UrlFetchApp.fetch(url, { headers: { "Authorization": `Bearer ${lineToken}` } });
+    const blob = response.getBlob();
+    let ext = type === 'image' ? 'jpg' : (type === 'video' ? 'mp4' : (type === 'audio' ? 'm4a' : 'bin'));
+    return {
+      fileName: `LINE_Media_${messageId}.${ext}`,
+      mimeType: blob.getContentType(),
+      base64: Utilities.base64Encode(blob.getBytes())
+    };
+  } catch (e) { return null; }
+}
+
+function sendLineReply(replyToken, text, lineToken) {
+  const url = "https://api.line.me/v2/bot/message/reply";
+  const payload = { replyToken: replyToken, messages: [{ type: "text", text: text }] };
+  UrlFetchApp.fetch(url, {
+    method: "post",
+    headers: { "Authorization": `Bearer ${lineToken}`, "Content-Type": "application/json" },
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
+  });
+}
+
+function fetchMetaMedia(url, type) {
+  try {
+    const response = UrlFetchApp.fetch(url);
+    const blob = response.getBlob();
+    let ext = type === 'image' ? 'jpg' : (type === 'video' ? 'mp4' : (type === 'audio' ? 'm4a' : 'bin'));
+    return {
+      fileName: `Meta_Media_${new Date().getTime()}.${ext}`,
+      mimeType: blob.getContentType(),
+      base64: Utilities.base64Encode(blob.getBytes())
+    };
+  } catch (e) { return null; }
+}
+
+function sendMetaReply(senderId, text, metaToken) {
+  const url = `https://graph.facebook.com/v20.0/me/messages?access_token=${metaToken}`;
+  const payload = { recipient: { id: senderId }, message: { text: text } };
+  UrlFetchApp.fetch(url, {
+    method: "post",
+    contentType: "application/json",
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
+  });
+}
+
+// ==========================================
+// Google 日曆自動同步 (一年範圍)
+// ==========================================
+function syncGoogleCalendarToSheet() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("日曆行程");
+  if (!sheet) return;
+
+  const calendarId = getCalendarIdFromSettings();
+  const calendar = calendarId ? CalendarApp.getCalendarById(calendarId) : CalendarApp.getDefaultCalendar();
+  if (!calendar) {
+    console.error("找不到指定的 Google 日曆，請確認參數設定或權限。");
+    return;
+  }
+
+  const now = new Date();
+  const oneYearLater = new Date();
+  oneYearLater.setDate(now.getDate() + 365);
+
+  const events = calendar.getEvents(now, oneYearLater);
+  const outputData = [];
+
+  events.forEach(event => {
+    const title = event.getTitle() || "無標題";
+    const desc = event.getDescription() || "";
+    const location = event.getLocation() || "";
+   
+    const startTimeObj = event.getStartTime();
+    const endTimeObj = event.getEndTime();
+    const startMs = startTimeObj.getTime();
+    const endMs = endTimeObj.getTime();
+
+    const eventDate = Utilities.formatDate(startTimeObj, "GMT+8", "yyyy-MM-dd");
+    let timeSlot = "";
+    if (event.isAllDayEvent()) {
+      timeSlot = "全天";
+    } else {
+      timeSlot = Utilities.formatDate(startTimeObj, "GMT+8", "HH:mm") + " - " + Utilities.formatDate(endTimeObj, "GMT+8", "HH:mm");
+    }
+
+    let durationHours = (endMs - startMs) / (1000 * 60 * 60);
+    durationHours = Math.round(durationHours * 100) / 100;
+
+    const guests = event.getGuestList();
+    const attendees = guests.map(g => g.getEmail()).join(", ");
+    const attendeeCount = guests.length;
+    const creators = event.getCreators().join(", ");
+    const lastUpdated = Utilities.formatDate(event.getLastUpdated(), "GMT+8", "yyyy-MM-dd HH:mm:ss");
+
+    outputData.push([
+      eventDate,
+      timeSlot,
+      durationHours,
+      title,
+      desc,
+      location,
+      attendees,
+      attendeeCount,
+      creators,
+      lastUpdated
+    ]);
+  });
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow > 1) {
+    sheet.getRange(2, 1, lastRow - 1, sheet.getMaxColumns()).clearContent();
+  }
+  if (outputData.length > 0) {
+    sheet.getRange(2, 1, outputData.length, outputData[0].length).setValues(outputData);
+  }
+}
+
+function getCalendarIdFromSettings() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("參數設定");
+  if (!sheet) return "";
+  const data = sheet.getDataRange().getValues();
+  for (let i = 0; i < data.length; i++) {
+    const keyName = data[i][0].toString().trim();
+    const val = data[i][1].toString().trim();
+    if ((keyName.includes("日曆") || keyName.includes("Email") || keyName.includes("Gmail")) && val.includes("@")) {
+      return val;
+    }
+  }
+  return "";
+}
+
+function setupCalendarSyncTrigger_GAS按執行() {
+  const triggers = ScriptApp.getProjectTriggers();
+  for (let i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === "syncGoogleCalendarToSheet") {
+      ScriptApp.deleteTrigger(triggers[i]);
+    }
+  }
+  ScriptApp.newTrigger("syncGoogleCalendarToSheet")
+    .timeBased()
+    .everyMinutes(5)
+    .create();
+   
+  console.log("✅ 日曆同步觸發器已成功設定！每 5 分鐘將自動更新。");
+}
+
+// ==========================================
+// 核心預約處理邏輯：寫入日曆與更新「互動紀錄」
+// ==========================================
+function processBooking(userId, dateStr, timeStr, serviceName) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("互動紀錄");
+  if (!sheet) {
+    return "錯誤：找不到「互動紀錄」工作表";
+  }
+
+  const timeParts = timeStr.split("-");
+  const startTimeStr = dateStr + "T" + timeParts[0].trim() + ":00";
+  const endTimeStr = dateStr + "T" + (timeParts[1] ? timeParts[1].trim() : "23:59") + ":00";
+  const startTime = new Date(startTimeStr);
+  const endTime = new Date(endTimeStr);
+
+  let calendarId = "";
+  try {
+    calendarId = getCalendarIdFromSettings();
+  } catch(e) {}
+  const calendar = calendarId ? CalendarApp.getCalendarById(calendarId) : CalendarApp.getDefaultCalendar();
+  if (!calendar) {
+    return "錯誤：找不到指定的 Google 日曆";
+  }
+
+  const eventTitle = "[線上預約] " + serviceName;
+  calendar.createEvent(eventTitle, startTime, endTime, {
+    description: "由 AI 智能客服自動建立之預約\n預約用戶 ID: " + userId
+  });
+  const calendarStatus = "✅ 已記至Google日曆 (" + Utilities.formatDate(new Date(), "GMT+8", "yyyy-MM-dd HH:mm:ss") + ")";
+
+  const newDateTimeStr = `[${dateStr} ${timeStr}]`;
+  const newServiceStr = `[${serviceName}]`;
+  const newStatusStr = `${newDateTimeStr}\n${newServiceStr}\n${calendarStatus}`;
+
+  const data = sheet.getDataRange().getValues();
+  let userRowIndex = -1;
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][1]).trim() === String(userId).trim()) {
+      userRowIndex = i + 1;
+      break;
+    }
+  }
+
+  if (userRowIndex !== -1) {
+    const appendData = (oldData, newData) => {
+      return oldData ? oldData + "\n-------------------\n" + newData : newData;
+    };
+
+    const currentDateTime = sheet.getRange(userRowIndex, 4).getValue();
+    const currentService = sheet.getRange(userRowIndex, 5).getValue();
+    const currentStatus = sheet.getRange(userRowIndex, 6).getValue();
+    const currentReminder2 = sheet.getRange(userRowIndex, 7).getValue();
+    const currentReminder1 = sheet.getRange(userRowIndex, 8).getValue();
+
+    sheet.getRange(userRowIndex, 4).setValue(appendData(currentDateTime, newDateTimeStr));
+    sheet.getRange(userRowIndex, 5).setValue(appendData(currentService, newServiceStr));
+    sheet.getRange(userRowIndex, 6).setValue(appendData(currentStatus, newStatusStr));
+   
+    sheet.getRange(userRowIndex, 7).setValue(appendData(currentReminder2, `[等待發送：預約 ${dateStr} 之前兩天提醒]`));
+    sheet.getRange(userRowIndex, 8).setValue(appendData(currentReminder1, `[等待發送：預約 ${dateStr} 之前一天提醒]`));
+
+    return "✅ 預約紀錄已成功追加至用戶資料並寫入日曆";
+  } else {
+    return "錯誤：在互動紀錄中找不到該用戶 ID：" + userId;
+  }
+}
+
+// ==========================================
+// 每日優化報告機制：自動生成、主動推播與經驗寫入
+// ==========================================
+function getSettingValue(keyToFind) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("角色設定");
+  if (!sheet) return "";
+  const data = sheet.getDataRange().getValues();
+  const cleanKey = keyToFind.toString().toLowerCase().replace(/\s+/g, '');
+
+  for (let i = 0; i < data.length; i++) {
+    const cellA = data[i][0].toString().toLowerCase().replace(/\s+/g, '');
+    if (cellA.includes(cleanKey)) {
+      return data[i][1].toString().trim();
+    }
+  }
+  return "";
+}
+
+function sendLinePushMessage(userId, text, lineToken) {
+  const url = "https://api.line.me/v2/bot/message/push";
+  const payload = {
+    to: userId,
+    messages: [{ type: "text", text: text }]
+  };
+  UrlFetchApp.fetch(url, {
+    method: "post",
+    headers: {
+      "Authorization": `Bearer ${lineToken}`,
+      "Content-Type": "application/json"
+    },
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
+  });
+}
+
+function generateAndSendOptimizationReport() {
+  const config = getDynamicConfig();
+  if (!config.apiKeys || config.apiKeys.length === 0 || !config.lineToken) {
+    console.error("缺少 API Key 或 LINE Token，無法發送報告");
+    return;
+  }
+
+  const bossLineId = getSettingValue("老闆自己個人line聊天ID");
+  const bossTask = getSettingValue("對老闆的任務需求");
+  const optDirection = getSettingValue("要發送優化方向");
+
+  if (!bossLineId) {
+    console.error("找不到老闆的 LINE ID，無法發送報告");
+    return;
+  }
+
+  const roleSettings = getSheetDataAsText("角色設定");
+  const pastExperiences = getSheetDataAsText("優化經驗");
+  const interactionData = getSheetDataAsText("互動紀錄");
+  const calendarData = getSheetDataAsText("日曆行程");
+
+  const systemPrompt =
+    `你現在是企業專屬的智能軍師，請完全依照以下【角色設定】的語氣與精神來扮演你的角色：\n` +
+    `${roleSettings}\n\n` +
+    `🚨【最高優先級絕對指令：優化經驗】\n` +
+    `以下是老闆過去的指導與前車之鑑，請務必吸收並在今天的報告中展現你已記取教訓：\n` +
+    `${pastExperiences}\n\n` +
+    `【對你的任務需求】：\n${bossTask}\n\n` +
+    `【今日優化與分析方向】：\n${optDirection}\n\n` +
+    `請根據以下我們系統近期的【互動紀錄】與【日曆行程】，進行吸收、消化、理解與分析。\n` +
+    `歸納出重點，有條理、列點式地產生「今日營運優化報告」，並給予精確的改善提案。\n\n` +
+    `【近期互動紀錄資料】：\n${interactionData}\n\n` +
+    `【近期日曆行程資料】：\n${calendarData}\n\n` +
+    `🚨【排版絕對禁忌】：報告內容絕對禁止使用 Markdown 語法 (例如：**粗體**、### 標題、# 符號)。請像真人高階幕僚傳送文字訊息一樣，只用純文字、空白行、或者數字 1. 2. 3. 來做層次排版，維持畫面乾淨清爽。\n\n` +
+    `請直接輸出報告內容，開頭請先親切地跟老闆打招呼。`;
+
+  let aiReport = generateAiResponse(systemPrompt, "【這是系統排程觸發的戰略任務】", "請開始產生今日優化報告", config.apiKeys);
+  aiReport = aiReport.replace(/\*\*/g, "").replace(/#{1,3}\s?/g, "");
+
+  sendLinePushMessage(bossLineId, aiReport, config.lineToken);
+
+  const expSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("優化經驗");
+  if (expSheet) {
+    const timestamp = Utilities.formatDate(new Date(), "GMT+8", "yyyy-MM-dd HH:mm:ss");
+    expSheet.appendRow([timestamp, aiReport, ""]);
+  }
+}
+
+function saveBossFeedbackToOptimization(bossText) {
+  const expSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("優化經驗");
+  if (!expSheet) return;
+
+  const data = expSheet.getDataRange().getValues();
+  const lastRowIndex = data.length;
+
+  for (let i = lastRowIndex - 1; i >= 1; i--) {
+    const aiReport = data[i][1];
+    const bossFeedback = data[i][2];
+
+    if (aiReport && !bossFeedback) {
+      expSheet.getRange(i + 1, 3).setValue(bossText);
+      return;
+    }
+  }
+
+  const timestamp = Utilities.formatDate(new Date(), "GMT+8", "yyyy-MM-dd HH:mm:ss");
+  expSheet.appendRow([timestamp, "【老闆主動提供之戰略指導/未對應特定報告】", bossText]);
+}
+
+function setupDailyReportTrigger_GAS按執行() {
+  const triggers = ScriptApp.getProjectTriggers();
+  for (let i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === "generateAndSendOptimizationReport") {
+      ScriptApp.deleteTrigger(triggers[i]);
+    }
+  }
+
+  ScriptApp.newTrigger("generateAndSendOptimizationReport")
+    .timeBased()
+    .everyDays(1)
+    .atHour(8)
+    .create();
+
+  console.log("✅ 每日優化報告觸發器已設定！每天早上 8 點將自動分析並發送報告。");
+}
