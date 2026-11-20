@@ -1154,7 +1154,15 @@
 
     
     if (hasMultimedia) {
-      return mediaHtml;
+      const cleanedText = rawStr
+        .replace(/\[系統通知：[^\]]*\][\s\S]*?(?=【老闆文字訊息】|$)/g, '')
+        .replace(/【老闆上傳之檔案】：[^\n]*/g, '')
+        .replace(/【老闆上傳之檔案解析】：[\s\S]*?(?=【老闆文字訊息】|$)/g, '')
+        .replace(/\[老闆上傳之檔案解析\]：[\s\S]*?(?=【老闆文字訊息】|$)/g, '')
+        .replace(/【老闆文字訊息】：\s*/g, '')
+        .replace(/https?:\/\/[^\s<>"']+/g, '')
+        .trim();
+      return (cleanedText ? stripMarkdown(cleanedText) + '<br>' : '') + mediaHtml;
     }
 
     return stripMarkdown(rawStr) + mediaHtml;
