@@ -33,15 +33,23 @@
     --text-dark: #2d2d2d;
   }
 
-  html, body {
+  html {
     margin: 0; padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  body {
+    margin: 0; padding: 0;
+    position: fixed;
+    top: var(--vv-top, 0px);
+    left: 0;
     width: 100%;
     height: 100dvh;
     height: var(--app-height, 100dvh);
     overflow: hidden;
-  }
-
-  body {
     font-family: 'PingFang TC', 'Noto Sans TC', -apple-system, BlinkMacSystemFont, 'Microsoft JhengHei', sans-serif;
     background-color: var(--bg-color);
     letter-spacing: 0.5px;
@@ -271,7 +279,7 @@
 
   .chat-input {
     flex: 1 1 100%; order: 1; padding: 12px 16px; border: 1px solid var(--border-light); border-radius: 12px; outline: none;
-    font-size: 15px; margin: 0; resize: none; font-family: inherit; box-sizing: border-box;
+    font-size: 16px; margin: 0; resize: none; font-family: inherit; box-sizing: border-box;
     height: 55px; line-height: 1.4; overflow-y: auto; background-color: #fafafa; transition: all 0.3s;
   }
   .chat-input:focus { background-color: #fff; border-color: var(--gx-blue); box-shadow: 0 0 0 2px rgba(58,124,184,0.1); }
@@ -579,7 +587,7 @@
     .chat-header { padding: 10px 16px 10px 40px; font-size: 15px; }
     .chat-messages { padding: 10px 12px; gap: 10px; }
     .chat-input-area { padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0px)); gap: 6px; }
-    .chat-input { height: 44px; padding: 9px 12px; font-size: 14px; }
+    .chat-input { height: 44px; padding: 9px 12px; font-size: 16px; }
     .icon-btn { padding: 4px; }
     .send-btn { width: 36px; height: 36px; }
   }
@@ -2221,13 +2229,15 @@ function switchTab(tabId) {
     msgContainer.scrollTop = msgContainer.scrollHeight;
   }
   
-  // 動態同步手機實際可視高度（應對瀏覽器縮放、工具列與虛擬鍵盤）
+  // 動態同步手機實際可視高度與位移（修正 iOS 鍵盤彈出白屏與任意縮放跑版）
   function syncAppViewport() {
     const vv = window.visualViewport;
     const h = Math.floor(vv ? vv.height : window.innerHeight);
+    const topOffset = vv ? Math.max(0, Math.round(vv.offsetTop)) : 0;
     if (h > 0) {
       document.documentElement.style.setProperty('--app-height', h + 'px');
     }
+    document.documentElement.style.setProperty('--vv-top', topOffset + 'px');
   }
   syncAppViewport();
   window.addEventListener('resize', syncAppViewport);
@@ -2236,6 +2246,17 @@ function switchTab(tabId) {
     window.visualViewport.addEventListener('resize', syncAppViewport);
     window.visualViewport.addEventListener('scroll', syncAppViewport);
   }
+  document.addEventListener('focusin', (e) => {
+    if (e.target && e.target.classList && e.target.classList.contains('chat-input')) {
+      setTimeout(() => {
+        window.scrollTo(0, 0);
+        syncAppViewport();
+        const activeTab = document.querySelector('.tab-content.active-tab');
+        const msgBox = activeTab ? activeTab.querySelector('.chat-messages') : null;
+        if (msgBox) msgBox.scrollTop = msgBox.scrollHeight;
+      }, 120);
+    }
+  });
 
   // 自動將現有 SVG 替換為極簡質感線條圖標 (Feather Icons)
   document.addEventListener('DOMContentLoaded', () => {
