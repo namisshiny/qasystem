@@ -6,26 +6,41 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>GROWTHX | AI智能企業助理與戰略系統</title>
+<title>GROWTHX-AI智能小幫手</title>
 <style>
   :root {
-    --primary-color: #4CAF50;
-    --bg-color: #f5f7f9;
+     
+    --gx-blue: #3A7CB8;
+    --gx-green: #A3C644;
+    --gx-yellow: #E9D53D;
+    --gx-purple: #623D8A;
+    --border-light: #ececec;
+
+    --primary-color: var(--gx-blue);
+    --bg-color: #ffffff;
     --chat-bg: #ffffff;
+    
+     
     --client-msg-bg: #ffffff;
     --client-msg-border: #e0e0e0;
-    --bot-msg-bg: #e3f2fd;
-    --admin-msg-bg: #dcf8c6;
-    --warroom-msg-bg: #fff9c4;
-    --text-dark: #333333;
+    --bot-msg-bg: #ffffff;
+    --bot-msg-border: var(--gx-blue);
+    --admin-msg-bg: #ffffff;
+    --admin-msg-border: var(--gx-green);
+    --warroom-msg-bg: #ffffff;
+    --warroom-msg-border: var(--gx-purple);
+    
+    --text-dark: #2d2d2d;
   }
 
   body {
     margin: 0; padding: 0;
-    font-family: 'Helvetica Neue', Helvetica, Arial, '微軟正黑體', sans-serif;
+    font-family: 'PingFang TC', 'Noto Sans TC', -apple-system, BlinkMacSystemFont, 'Microsoft JhengHei', sans-serif;
     background-color: var(--bg-color);
     overflow: hidden;
+    letter-spacing: 0.5px;
   }
+
 
   #login-overlay {
     position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
@@ -35,51 +50,52 @@
   }
  
   .login-box {
-    background: #fff; padding: 40px; border-radius: 12px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 90%; max-width: 400px;
-    text-align: center;
+    background: #fff; padding: 40px; border-radius: 16px;
+    border: 1px solid var(--border-light); width: 90%; max-width: 400px;
+    text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.03);
   }
  
-  .login-box h2 { margin-top: 0; color: var(--primary-color); font-size: 24px;}
-  .login-box p { color: #666; margin-bottom: 20px; font-size: 14px;}
+  .login-box h2 { margin-top: 0; color: var(--gx-blue); font-size: 24px; font-weight: 500;}
+  .login-box p { color: #888; margin-bottom: 24px; font-size: 14px;}
  
   .login-box input {
     width: 100%; padding: 12px; margin-bottom: 15px;
-    border: 1px solid #ddd; border-radius: 6px; font-size: 15px; box-sizing: border-box;
-    outline: none; transition: border 0.3s;
+    border: 1px solid var(--border-light); border-radius: 8px; font-size: 15px; box-sizing: border-box;
+    outline: none; transition: all 0.3s; background-color: #fafafa;
   }
+  .login-box input:focus { background-color: #fff; border-color: var(--gx-blue); }
  
   .login-box input:focus { border-color: var(--primary-color); }
  
   .login-box button {
     width: 100%; padding: 14px; background-color: var(--primary-color);
     color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: bold;
-    cursor: pointer; transition: background 0.3s;
+    cursor: pointer; transition: all 0.3s;
   }
  
-  .login-box button:hover { background-color: #45a049; }
-  .login-box button:disabled { background-color: #ccc; cursor: not-allowed; }
+  .login-box button:hover { opacity: 0.85; }
+  .login-box button:disabled { background-color: #ccc; cursor: not-allowed; opacity: 0.6; }
  
   #login-msg { margin-top: 10px; color: #d32f2f; font-size: 14px; min-height: 20px;}
+
 
   #tab-navbar {
     display: none;
     height: 50px;
     background-color: #ffffff;
-    border-bottom: 1px solid #ddd;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    border-bottom: 1px solid var(--border-light);
     z-index: 100;
     position: relative;
   }
 
   .tab-btn {
-    flex: 1; background: transparent; border: none; font-size: 16px;
-    font-weight: bold; color: #666; cursor: pointer; transition: all 0.3s ease;
+    flex: 1; background: transparent; border: none; font-size: 15px;
+    font-weight: 500; color: #999; cursor: pointer; transition: all 0.3s ease;
     outline: none; display: flex; align-items: center; justify-content: center; gap: 6px;
   }
 
   .tab-btn.active {
-    color: var(--primary-color); border-bottom: 3px solid var(--primary-color); background-color: #f9fdf9;
+    color: var(--gx-blue); border-bottom: 2px solid var(--gx-blue); background-color: #ffffff;
   }
 
   .tab-content {
@@ -91,39 +107,43 @@
   #app-container { display: flex; height: 100%; width: 100%; }
 
   .sidebar {
-    width: 320px; background: #fff; border-right: 1px solid #ddd;
+    width: 320px; background: #fff; border-right: 1px solid var(--border-light);
     display: flex; flex-direction: column; transition: transform 0.3s ease;
   }
 
   .sidebar-header {
-    background-color: var(--primary-color); color: white; padding: 15px 20px;
-    text-align: center; font-size: 18px; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.1); z-index: 10;
+    background-color: #ffffff; color: var(--gx-blue); padding: 15px 20px;
+    text-align: center; font-size: 18px; font-weight: 600; border-bottom: 1px solid var(--border-light); z-index: 10;
   }
 
-  .user-list { flex: 1; overflow-y: auto; background-color: #fafafa; }
+  .user-list { flex: 1; overflow-y: auto; background-color: #ffffff; }
 
   .user-item {
-    padding: 18px 20px; border-bottom: 1px solid #eee; cursor: pointer; font-size: 16px;
-    color: var(--text-dark); display: flex; align-items: center; transition: background 0.2s;
+    padding: 18px 20px; border-bottom: 1px solid var(--border-light); cursor: pointer; font-size: 15px;
+    color: var(--text-dark); display: flex; align-items: center; transition: all 0.2s;
   }
 
   .user-item:hover, .user-item.active {
-    background-color: #e8f5e9; border-left: 5px solid var(--primary-color);
+    background-color: #fafafa; border-left: 3px solid var(--gx-blue);
   }
 
-  .user-item.state-booked { background-color: #fff9c4; border-left: 5px solid #fbc02d; }
-  .user-item.state-booked.active { background-color: #fff59d; }
-  .user-item.state-completed { background-color: #e8f5e9; border-left: 5px solid #4CAF50; }
-  .user-item.state-completed.active { background-color: #c8e6c9; }
+  .user-item.state-booked { background-color: #ffffff; border-left: 3px solid var(--gx-yellow); }
+  .user-item.state-booked.active { background-color: #fafafa; }
+  .user-item.state-completed { background-color: #ffffff; border-left: 3px solid var(--gx-green); }
+  .user-item.state-completed.active { background-color: #fafafa; }
+
 
   .user-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: bold;}
 
+
   .count-badges { display: flex; gap: 6px; margin-left: 8px; align-items: center; }
+
 
   .badge {
     display: flex; align-items: center; justify-content: center; font-size: 12px;
     font-weight: bold; padding: 3px 8px; border-radius: 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.08);
   }
+
 
   .badge-client { background-color: #dcf8c6; color: #2b5a10; }
   .badge-ai { background-color: #e3f2fd; color: #0d47a1; }
@@ -132,40 +152,44 @@
  
   .badge-label { background-color: #e0e0e0; color: #333; font-size: 11px; padding: 2px 6px; border-radius: 4px; margin-top: 4px; display: inline-block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100px; font-weight: normal;}
 
+
   @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
+
 
   .badge svg { width: 14px; height: 14px; margin-right: 4px; fill: currentColor; }
 
+
   .chat-area { flex: 1; display: flex; flex-direction: column; background: var(--chat-bg); position: relative; }
 
+
   .chat-header {
-    background-color: var(--primary-color); color: white; padding: 15px 20px; text-align: center;
-    font-size: 18px; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.1); z-index: 10;
-    display: flex; align-items: center; justify-content: center; position: relative;
+    background-color: #ffffff; color: var(--text-dark); padding: 15px 20px 15px 45px; text-align: left;
+    font-size: 17px; font-weight: 500; border-bottom: 1px solid var(--border-light); z-index: 10;
+    display: flex; align-items: center; justify-content: flex-start; position: relative;
   }
 
-  .back-btn { display: none; position: absolute; left: 15px; font-size: 28px; cursor: pointer; line-height: 1; }
+  .back-btn { display: none; position: absolute; left: 12px; font-size: 28px; cursor: pointer; line-height: 1; color: var(--gx-blue); }
 
   .logout-header-btn {
     position: absolute;
     right: 15px;
     font-size: 13px;
     cursor: pointer;
-    color: #fff;
-    background: rgba(255,255,255,0.2);
+    color: var(--text-dark);
+    background: #ffffff;
     padding: 4px 10px;
     border-radius: 12px;
-    border: 1px solid rgba(255,255,255,0.4);
-    transition: background 0.3s;
+    border: 1px solid var(--border-light);
+    transition: all 0.3s;
   }
-  .logout-header-btn:hover { background: rgba(255,255,255,0.4); }
+  .logout-header-btn:hover { background: #fafafa; border-color: #ccc; }
 
-  .chat-messages { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; background-color: var(--bg-color); scroll-behavior: smooth; }
+  .chat-messages { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; background-color: #ffffff; scroll-behavior: smooth; }
 
   .msg-wrapper {
     display: flex;
     align-items: flex-end;
-    gap: 6px;
+    gap: 8px;
     max-width: 100%;
   }
   .msg-wrapper.right {
@@ -178,7 +202,7 @@
   }
   .msg-time {
     font-size: 11px;
-    color: #999;
+    color: #bbb;
     margin-bottom: 4px;
     white-space: nowrap;
   }
@@ -189,53 +213,56 @@
     text-align: center;
   }
   .date-divider span {
-    background-color: #e0e0e0;
-    color: #555;
+    background-color: transparent;
+    color: #bbb;
     font-size: 12px;
     padding: 4px 12px;
-    border-radius: 12px;
     display: inline-block;
   }
 
   .msg-bubble {
-    max-width: 75%; padding: 12px 16px; border-radius: 18px; font-size: 15px;
-    line-height: 1.5; word-wrap: break-word; position: relative; box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    max-width: 75%; padding: 12px 18px; border-radius: 18px; font-size: 15px;
+    line-height: 1.5; word-wrap: break-word; position: relative; background-color: #ffffff; box-shadow: none;
   }
 
-  .msg-client { background-color: var(--client-msg-bg); border: 1px solid var(--client-msg-border); color: var(--text-dark); border-bottom-left-radius: 4px; }
-  .msg-ai { background-color: var(--bot-msg-bg); color: #0d47a1; border-bottom-right-radius: 4px; }
-  .msg-admin { background-color: var(--admin-msg-bg); color: var(--text-dark); border-bottom-right-radius: 4px; }
-  .msg-warroom { background-color: var(--warroom-msg-bg); color: var(--text-dark); border: 1px solid #fbc02d; border-bottom-left-radius: 4px; }
+  .msg-client { border: 1px solid var(--client-msg-border); color: var(--text-dark); border-bottom-left-radius: 4px; }
+  .msg-ai { border: 1px solid var(--bot-msg-border); color: var(--text-dark); border-bottom-right-radius: 4px; }
+  .msg-admin { border: 1px solid var(--admin-msg-border); color: var(--text-dark); border-bottom-right-radius: 4px; }
+  .msg-warroom { border: 1px solid var(--warroom-msg-border); color: var(--text-dark); border-bottom-left-radius: 4px; }
  
   .msg-pending { opacity: 0.8; animation: breathe 1.5s infinite ease-in-out; }
   @keyframes breathe { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
 
   .chat-input-area {
-    display: flex; padding: 10px 15px; background: #fff; border-top: 1px solid #ddd;
-    align-items: center; gap: 3px; padding-bottom: env(safe-area-inset-bottom, 10px);
+    display: flex; padding: 12px 15px; background: #fff; border-top: 1px solid var(--border-light);
+    align-items: center; flex-wrap: wrap; gap: 8px 6px; padding-bottom: env(safe-area-inset-bottom, 12px);
   }
 
   .icon-btn {
-    background: transparent; border: none; cursor: pointer; padding: 8px; display: flex;
-    align-items: center; justify-content: center; border-radius: 50%; transition: background 0.3s;
+    background: transparent; border: none; cursor: pointer; padding: 6px; display: flex;
+    align-items: center; justify-content: center; border-radius: 50%; transition: all 0.3s;
+    order: 2;
   }
-  .icon-btn:hover { background-color: #f1f0f0; }
-  .icon-btn svg { width: 22px; height: 22px; fill: #666; transition: fill 0.3s; }
+  .icon-btn:hover { background-color: #fafafa; }
+  .icon-btn svg { width: 22px; height: 22px; fill: none; stroke: #999; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; transition: stroke 0.3s; }
+  .icon-btn:hover svg { stroke: var(--gx-blue); }
 
   .chat-input {
-    flex: 1; padding: 12px; border: 1px solid #ddd; border-radius: 20px; outline: none;
-    font-size: 15px; margin: 0 5px; resize: none; font-family: inherit; box-sizing: border-box;
-    height: 45px; line-height: 1.3; overflow-y: auto;
+    flex: 1 1 100%; order: 1; padding: 12px 16px; border: 1px solid var(--border-light); border-radius: 12px; outline: none;
+    font-size: 15px; margin: 0; resize: none; font-family: inherit; box-sizing: border-box;
+    height: 55px; line-height: 1.4; overflow-y: auto; background-color: #fafafa; transition: all 0.3s;
   }
+  .chat-input:focus { background-color: #fff; border-color: var(--gx-blue); box-shadow: 0 0 0 2px rgba(58,124,184,0.1); }
 
   .send-btn {
-    background-color: var(--primary-color); color: white; border: none; width: 42px; height: 42px;
+    background-color: #fff; color: var(--gx-blue); border: 1px solid var(--border-light); width: 40px; height: 40px;
     border-radius: 50%; cursor: pointer; display: flex; justify-content: center; align-items: center;
-    transition: background 0.3s, opacity 0.3s; flex-shrink: 0;
+    transition: all 0.3s; flex-shrink: 0; order: 2; margin-left: auto;
   }
-  .send-btn:hover:not(:disabled) { background-color: #45a049; }
-  .send-btn:disabled { background-color: #ccc; cursor: not-allowed; opacity: 0.6; }
-  .send-btn svg { width: 20px; height: 20px; fill: white; }
+  .send-btn:hover:not(:disabled) { background-color: var(--gx-blue); border-color: var(--gx-blue); }
+  .send-btn:hover:not(:disabled) svg { stroke: #fff; }
+  .send-btn:disabled { border-color: #eee; cursor: not-allowed; opacity: 0.6; }
+  .send-btn svg { width: 18px; height: 18px; fill: none; stroke: var(--gx-blue); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; transition: all 0.3s; }
 
   .file-preview-area {
     display: none; padding: 8px 15px; background: #e8f5e9; font-size: 13px; color: #2b5a10;
@@ -250,6 +277,271 @@
     font-weight: bold;
   }
 
+
+  .pending-thumb-box {
+    margin-top: 8px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .pending-thumb-img {
+    width: 56px;
+    height: 56px;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 1px solid var(--border-light);
+    cursor: zoom-in;
+  }
+
+  .chat-media-wrap {
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-width: 100%;
+  }
+
+  .chat-media-img {
+    display: block;
+    max-width: 100%;
+    max-height: 240px;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    border-radius: 10px;
+    border: 1px solid var(--border-light);
+    cursor: zoom-in;
+    transition: opacity 0.2s ease;
+  }
+
+  .chat-media-img:hover {
+    opacity: 0.9;
+  }
+
+  .chat-media-video {
+    max-width: 100%;
+    max-height: 240px;
+    border-radius: 10px;
+    border: 1px solid var(--border-light);
+    outline: none;
+  }
+
+  .voice-player {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    min-width: 210px;
+    max-width: 100%;
+    box-sizing: border-box;
+    border: 1px solid var(--border-light);
+    border-radius: 14px;
+    background-color: #fafafa;
+  }
+
+  .voice-play-btn {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    border: 1px solid var(--gx-blue);
+    background-color: #ffffff;
+    color: var(--gx-blue);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    padding: 0;
+    transition: all 0.2s ease;
+  }
+
+  .voice-play-btn:hover,
+  .voice-play-btn.playing {
+    background-color: var(--gx-blue);
+    color: #ffffff;
+  }
+
+  .voice-track-wrap {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 110px;
+  }
+
+  .voice-progress-bg {
+    width: 100%;
+    height: 5px;
+    background-color: #e4e8ed;
+    border-radius: 999px;
+    overflow: hidden;
+    cursor: pointer;
+    position: relative;
+  }
+
+  .voice-progress-fill {
+    width: 0%;
+    height: 100%;
+    background-color: var(--gx-blue);
+    border-radius: 999px;
+    transition: width 0.08s linear;
+  }
+
+  .voice-time {
+    font-size: 11px;
+    color: #888;
+    display: flex;
+    justify-content: space-between;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .chat-file-card {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border: 1px solid var(--border-light);
+    border-radius: 10px;
+    background-color: #fafafa;
+    color: var(--gx-blue);
+    font-size: 13px;
+    text-decoration: none;
+    word-break: break-all;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .chat-file-card:hover {
+    background-color: #f0f6fc;
+    border-color: var(--gx-blue);
+  }
+
+  .media-lightbox {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(4px);
+    z-index: 9999;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+    box-sizing: border-box;
+    cursor: zoom-out;
+  }
+
+  .media-lightbox.active {
+    display: flex;
+  }
+
+  .media-lightbox img {
+    max-width: 92vw;
+    max-height: 86vh;
+    object-fit: contain;
+    border-radius: 8px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+    cursor: zoom-out;
+  }
+
+  .lightbox-close-btn {
+    position: fixed;
+    top: 18px;
+    right: 18px;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.2s ease;
+  }
+
+  .lightbox-close-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+  }
+
+  .icon-btn.recording svg {
+    stroke: #d32f2f;
+    animation: pulse 1.2s infinite;
+  }
+
+  .voice-record-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 8px 15px;
+    background-color: #fff5f5;
+    border-top: 1px solid #ffcdd2;
+    font-size: 13px;
+    color: #c62828;
+  }
+
+  .voice-record-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .voice-record-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: #d32f2f;
+    animation: pulse 1.2s infinite;
+  }
+
+  .voice-record-dot.paused {
+    background-color: #999;
+    animation: none;
+  }
+
+  .voice-record-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .voice-ctrl-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 1px solid var(--border-light);
+    background-color: #ffffff;
+    color: var(--text-dark);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+    transition: all 0.2s ease;
+  }
+
+  .voice-ctrl-btn:hover {
+    border-color: var(--gx-blue);
+    color: var(--gx-blue);
+  }
+
+  .voice-ctrl-btn.stop {
+    border-color: #d32f2f;
+    color: #d32f2f;
+  }
+
+  .voice-ctrl-btn.stop:hover {
+    background-color: #d32f2f;
+    color: #ffffff;
+  }
+
   @media (max-width: 768px) {
     .sidebar { width: 100%; position: absolute; z-index: 20; height: 100%; }
     .sidebar.hidden { transform: translateX(-100%); }
@@ -260,9 +552,10 @@
 </head>
 <body>
 
+
 <div id="login-overlay">
   <div class="login-box">
-    <h2 id="login-title">AI 系統入口</h2>
+    <h2 id="login-title"></h2>
     <p>請輸入您的資訊以登入或開始對話</p>
     <input type="text" id="login-name" placeholder="您的稱呼 (如：王小明)">
     <input type="email" id="login-email" placeholder="您的 Email">
@@ -271,24 +564,26 @@
   </div>
 </div>
 
+
 <div id="tab-navbar">
   <button id="btn-admin" class="tab-btn active" onclick="switchTab('admin')">
     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
-    系統監控台
+    監控
   </button>
   <button id="btn-client" class="tab-btn" onclick="switchTab('client')">
     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
-    客戶測試端
+    測試
   </button>
   <button id="btn-warroom" class="tab-btn" onclick="switchTab('warroom')">
     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-    老闆戰情室
+    戰情
   </button>
   <button id="btn-logout" class="tab-btn" onclick="logout()" style="flex: 0.6; color: #d32f2f;">
     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
-    登出
+    
   </button>
 </div>
+
 
 <div id="view-admin" class="tab-content">
   <div id="app-container">
@@ -298,6 +593,7 @@
         <div style="padding: 20px; text-align: center; color: #888;">正在載入資料庫...</div>
       </div>
     </div>
+
 
     <div class="chat-area">
       <div class="chat-header">
@@ -311,10 +607,12 @@
           </div>
       </div>
 
+
       <div id="admin-file-preview" class="file-preview-area">
         📎 準備上傳檔案：<span class="file-name-display" style="font-weight: bold;"></span>
         <span onclick="clearSelectedFile()" style="margin-left: 15px; cursor: pointer; color: #d32f2f;">✖ 移除</span>
       </div>
+
 
       <div class="chat-input-area">
         <button class="icon-btn" onclick="document.getElementById('global-file-upload').click()" title="多媒體">
@@ -323,9 +621,10 @@
         <button class="icon-btn" onclick="document.getElementById('global-file-upload').click()" title="文件">
           <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
         </button>
-        <button id="mic-btn" class="icon-btn" onclick="document.getElementById('global-file-upload').click()" title="語音">
+        <button id="mic-btn" class="icon-btn" onclick="toggleVoiceRecording(this)" title="語音">
           <svg viewBox="0 0 24 24"><path d="M12 14c1.66 0 2.99-1.34 2.99-3L15 5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/></svg>
         </button>
+
 
         <textarea id="chat-input" class="chat-input" placeholder="輸入訊息強制接管... (Shift+Enter 換行)" onkeydown="handleKeyPress(event)"></textarea>
        
@@ -336,6 +635,7 @@
     </div>
   </div>
 </div>
+
 
 <div id="view-client" class="tab-content">
   <div class="chat-area" style="height: 100%;">
@@ -350,10 +650,12 @@
        </div>
     </div>
 
+
     <div id="client-file-preview" class="file-preview-area">
       📎 準備上傳檔案：<span class="file-name-display" style="font-weight: bold;"></span>
       <span onclick="clearSelectedFile()" style="margin-left: 15px; cursor: pointer; color: #d32f2f;">✖ 移除</span>
     </div>
+
 
     <div class="chat-input-area">
       <button class="icon-btn" onclick="document.getElementById('global-file-upload').click()" title="多媒體">
@@ -362,9 +664,10 @@
       <button class="icon-btn" onclick="document.getElementById('global-file-upload').click()" title="文件">
         <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
       </button>
-      <button class="icon-btn" onclick="document.getElementById('global-file-upload').click()" title="語音">
+      <button class="icon-btn" onclick="toggleVoiceRecording(this)" title="語音">
         <svg viewBox="0 0 24 24"><path d="M12 14c1.66 0 2.99-1.34 2.99-3L15 5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/></svg>
       </button>
+
 
       <textarea id="client-chat-input" class="chat-input" placeholder="請輸入訊息... (Shift+Enter 換行)" onkeydown="handleClientKeyPress(event)"></textarea>
      
@@ -375,6 +678,7 @@
   </div>
 </div>
 
+
 <div id="view-warroom" class="tab-content">
   <div class="chat-area" style="height: 100%;">
     <div class="chat-header">
@@ -383,14 +687,16 @@
    
     <div id="warroom-chat-messages" class="chat-messages">
        <div style="padding: 20px; text-align: center; color: #888; margin-top: 50px;">
-         歡迎來到企業戰情室。<br><br>系統大腦已準備就緒，您可以隨時請我分析「客戶管理」、「收支記帳」或提供高商業價值的決策建議。
+         歡迎來到企業戰情室。<br><br>系統大腦已準備就緒，您可以隨時請我分析「客服內容」或提供高商業價值的決策建議。
        </div>
     </div>
+
 
     <div id="warroom-file-preview" class="file-preview-area">
       📎 準備上傳檔案：<span class="file-name-display" style="font-weight: bold;"></span>
       <span onclick="clearSelectedFile()" style="margin-left: 15px; cursor: pointer; color: #d32f2f;">✖ 移除</span>
     </div>
+
 
     <div class="chat-input-area">
       <button class="icon-btn" onclick="document.getElementById('global-file-upload').click()" title="多媒體">
@@ -403,7 +709,8 @@
         <svg viewBox="0 0 24 24"><path d="M12 14c1.66 0 2.99-1.34 2.99-3L15 5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/></svg>
       </button>
 
-      <textarea id="warroom-chat-input" class="chat-input" placeholder="輸入您的指令或提問，進行深層戰略分析... (Shift+Enter 換行)" onkeydown="handleWarRoomKeyPress(event)"></textarea>
+
+      <textarea id="warroom-chat-input" class="chat-input" placeholder="輸入您的指令或提問... (Shift+Enter 換行)" onkeydown="handleWarRoomKeyPress(event)"></textarea>
      
       <button id="warroom-send-btn" class="send-btn" onclick="sendWarRoomMessage()">
         <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
@@ -412,14 +719,27 @@
   </div>
 </div>
 
+
+<div id="media-lightbox" class="media-lightbox" onclick="closeMediaLightbox()">
+  <button type="button" class="lightbox-close-btn" onclick="closeMediaLightbox()" aria-label="關閉預覽">
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18"></line>
+      <line x1="6" y1="6" x2="18" y2="18"></line>
+    </svg>
+  </button>
+  <img id="lightbox-img" src="" alt="放大預覽">
+</div>
+
 <input type="file" id="global-file-upload" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt" style="display: none;" onchange="handleFileUpload(event)">
 
+
 <script>
-  // 前端雙棲環境常數定義
+  
   const GAS_WEB_URL = "https://script.google.com/macros/s/AKfycbzfx4XUNMPFSGAJaRy49ICRC5f3cIsh4k4XQanCgqM0K8bpLYegWuMk_ktKOZML1h8efA/exec";
   const GAS_URL = GAS_WEB_URL;
 
-  // 通用前後端資料流呼叫通道 (支援雙棲環境與嚴格拆包裝)
+
+  
   function requestBackend(payload) {
     if (typeof google !== 'undefined' && google.script && google.script.run && typeof google.script.run.serverDispatcher === 'function') {
       return new Promise((resolve, reject) => {
@@ -450,8 +770,10 @@
     }
   }
 
+
   const adminIcon = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: text-bottom; margin-right: 4px;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>`;
   const advisorIcon = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: text-bottom; margin-right: 4px;"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>`;
+
 
   // 全局變數
   let systemBotName = "智能客服";
@@ -460,11 +782,13 @@
   let lastAdminDate = "";
   let lastWarRoomDate = "";
 
-  // 用來追蹤背景請求與延遲氣泡動畫
+
+  
   let clientPendingCount = 0;
   let warroomPendingCount = 0;
   let clientThinkingTimer = null;
   let warroomThinkingTimer = null;
+
 
   function displayErrorInChat(containerId, errorMsg) {
     const msgContainer = document.getElementById(containerId);
@@ -474,6 +798,7 @@
     msgContainer.appendChild(errDiv);
     msgContainer.scrollTop = msgContainer.scrollHeight;
   }
+
 
   function logout() {
     localStorage.removeItem('growthx_user_email');
@@ -485,6 +810,7 @@
         pollingInterval = null;
     }
 
+
     currentUserEmail = "";
     currentUserName = "";
     currentUserRole = "";
@@ -492,6 +818,7 @@
     selectedUserRowId = null;
     localChatCache = {};
     localUserCache = [];
+
 
     document.getElementById('login-msg').innerText = "";
     document.getElementById('login-name').value = "";
@@ -502,34 +829,38 @@
     document.querySelectorAll('.tab-content').forEach(view => view.classList.remove('active-tab'));
   }
 
+
   window.onload = function() {
     requestBackend({ action: 'get_sys_config' })
     .then(data => {
         if (data && data.botName) {
             systemBotName = data.botName;
             document.title = systemBotName + " 企業助理與戰略系統";
-            document.getElementById('login-title').innerText = systemBotName + " 系統入口";
+            document.getElementById('login-title').innerText = systemBotName + "";
             document.getElementById('client-chat-title').innerText = systemBotName;
         }
     })
     .catch(err => console.error("系統參數載入失敗", err));
 
+
     const savedEmail = localStorage.getItem('growthx_user_email');
     const savedName = localStorage.getItem('growthx_user_name');
     const savedRole = localStorage.getItem('growthx_user_role');
 
-    if (savedEmail && savedName && savedRole) {
-        currentUserEmail = savedEmail;
-        currentUserName = savedName;
-        currentUserRole = savedRole;
-        document.getElementById('login-overlay').style.display = 'none';
 
-        if(currentUserRole === 'boss') {
-          document.getElementById('tab-navbar').style.display = 'flex';
-          switchTab('admin');
-          fetchDataBundle(false);
-          pollingInterval = setInterval(() => { fetchDataBundle(true); }, 5000);
-        } else {
+    if (savedEmail && savedName && savedRole) {
+          currentUserEmail = savedEmail;
+          currentUserName = savedName;
+          currentUserRole = savedRole;
+          document.getElementById('login-overlay').style.display = 'none';
+
+          if(currentUserRole === 'boss') {
+            document.getElementById('tab-navbar').style.display = 'flex';
+            switchTab('admin');
+            fetchDataBundle(false);
+            loadWarRoomHistory();
+            pollingInterval = setInterval(() => { fetchDataBundle(true); }, 5000);
+          } else {
           document.getElementById('tab-navbar').style.display = 'none';
           document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active-tab'));
           document.getElementById('view-client').classList.add('active-tab');
@@ -538,6 +869,7 @@
         }
     }
   };
+
 
   function processMessageContent(rawText) {
     if (!rawText) rawText = "";
@@ -561,6 +893,7 @@
     return { date: msgDate, time: msgTime, text: cleanText };
   }
 
+
   function stripMarkdown(text) {
     if (!text) return "";
     return text.replace(/\*\*(.*?)\*\*/g, '$1')
@@ -569,6 +902,221 @@
                .replace(/`/g, '')
                .replace(/\n/g, '<br>');
   }
+
+  let pendingFilePreviewUrl = "";
+
+  function openMediaLightbox(src) {
+    if (!src) return;
+    const lightbox = document.getElementById('media-lightbox');
+    const imgEl = document.getElementById('lightbox-img');
+    imgEl.src = src;
+    lightbox.classList.add('active');
+  }
+
+  function closeMediaLightbox() {
+    const lightbox = document.getElementById('media-lightbox');
+    const imgEl = document.getElementById('lightbox-img');
+    lightbox.classList.remove('active');
+    imgEl.src = '';
+  }
+
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeMediaLightbox();
+  });
+
+  const voicePlaySvg = '<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" stroke="none"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg>';
+  const voicePauseSvg = '<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" stroke="none"><rect x="6" y="4" width="4" height="16" rx="1"></rect><rect x="14" y="4" width="4" height="16" rx="1"></rect></svg>';
+
+  function formatAudioTime(sec) {
+    if (!isFinite(sec) || sec < 0) return "0:00";
+    const m = Math.floor(sec / 60);
+    const s = Math.floor(sec % 60);
+    return m + ":" + String(s).padStart(2, "0");
+  }
+
+  function toggleVoicePlay(btn) {
+    const player = btn.closest('.voice-player');
+    const audio = player.querySelector('audio');
+    if (!audio) return;
+
+    if (audio.paused) {
+      document.querySelectorAll('.voice-player audio').forEach(other => {
+        if (other !== audio && !other.paused) {
+          other.pause();
+          const otherBtn = other.closest('.voice-player').querySelector('.voice-play-btn');
+          if (otherBtn) {
+            otherBtn.classList.remove('playing');
+            otherBtn.innerHTML = voicePlaySvg;
+          }
+        }
+      });
+      audio.play().then(() => {
+        btn.classList.add('playing');
+        btn.innerHTML = voicePauseSvg;
+      }).catch(err => console.error("語音播放失敗:", err));
+    } else {
+      audio.pause();
+      btn.classList.remove('playing');
+      btn.innerHTML = voicePlaySvg;
+    }
+  }
+
+  function updateVoiceDuration(audioEl) {
+    const player = audioEl.closest('.voice-player');
+    const durEl = player.querySelector('.voice-duration');
+    if (durEl && isFinite(audioEl.duration)) {
+      durEl.innerText = formatAudioTime(audioEl.duration);
+    }
+  }
+
+  function updateVoiceProgress(audioEl) {
+    const player = audioEl.closest('.voice-player');
+    const fillEl = player.querySelector('.voice-progress-fill');
+    const curEl = player.querySelector('.voice-current');
+    if (curEl) curEl.innerText = formatAudioTime(audioEl.currentTime);
+    if (fillEl && isFinite(audioEl.duration) && audioEl.duration > 0) {
+      fillEl.style.width = ((audioEl.currentTime / audioEl.duration) * 100) + '%';
+    }
+  }
+
+  function resetVoicePlayer(audioEl) {
+    const player = audioEl.closest('.voice-player');
+    const btn = player.querySelector('.voice-play-btn');
+    const fillEl = player.querySelector('.voice-progress-fill');
+    const curEl = player.querySelector('.voice-current');
+    if (btn) {
+      btn.classList.remove('playing');
+      btn.innerHTML = voicePlaySvg;
+    }
+    if (fillEl) fillEl.style.width = '0%';
+    if (curEl) curEl.innerText = '0:00';
+  }
+
+  function seekVoiceAudio(event, trackEl) {
+    const player = trackEl.closest('.voice-player');
+    const audio = player.querySelector('audio');
+    if (!audio || !isFinite(audio.duration) || audio.duration <= 0) return;
+    const rect = trackEl.getBoundingClientRect();
+    const ratio = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
+    audio.currentTime = ratio * audio.duration;
+    updateVoiceProgress(audio);
+  }
+
+  function handleVoiceError(audioEl) {
+    const player = audioEl.closest('.voice-player');
+    const fallback = player ? player.nextElementSibling : null;
+    if (player && fallback && fallback.classList.contains('chat-file-card')) {
+      player.style.display = 'none';
+      fallback.style.display = 'inline-flex';
+    }
+  }
+
+  function buildVoicePlayerHtml(audioSrc, fallbackUrl) {
+    const fallbackHtml = fallbackUrl
+      ? `<a href="${fallbackUrl}" target="_blank" rel="noopener noreferrer" class="chat-file-card" style="display:none;">↗ 開啟語音檔案</a>`
+      : "";
+    return `<div class="chat-media-wrap"><div class="voice-player"><audio preload="metadata" src="${audioSrc}" onloadedmetadata="updateVoiceDuration(this)" ontimeupdate="updateVoiceProgress(this)" onended="resetVoicePlayer(this)" onerror="handleVoiceError(this)"></audio><button type="button" class="voice-play-btn" onclick="toggleVoicePlay(this)" aria-label="播放或暫停">${voicePlaySvg}</button><div class="voice-track-wrap"><div class="voice-progress-bg" onclick="seekVoiceAudio(event, this)"><div class="voice-progress-fill"></div></div><div class="voice-time"><span class="voice-current">0:00</span><span class="voice-duration">0:00</span></div></div></div>${fallbackHtml}</div>`;
+  }
+
+  function buildLocalFilePreviewHtml(fileObj, previewUrl) {
+    if (!fileObj) return "";
+    const mime = fileObj.mimeType || "";
+    const name = fileObj.fileName || "未命名檔案";
+    const safeName = name.replace(/</g, "<").replace(/>/g, ">");
+    if (mime.startsWith("image/") && previewUrl) {
+      return `<div class="chat-media-wrap"><img src="${previewUrl}" alt="${safeName}" class="chat-media-img" onclick="openMediaLightbox(this.src)"></div>`;
+    }
+    if (mime.startsWith("video/") && previewUrl) {
+      return `<div class="chat-media-wrap"><video src="${previewUrl}" controls class="chat-media-video"></video></div>`;
+    }
+    if ((mime.startsWith("audio/") || /\.(mp3|wav|m4a|ogg|aac)$/i.test(name)) && previewUrl) {
+      return buildVoicePlayerHtml(previewUrl, "");
+    }
+    return `<div class="chat-media-wrap"><span class="chat-file-card">📎 ${safeName}</span></div>`;
+  }
+
+  function extractDriveFileId(url) {
+    if (!url) return "";
+    const dMatch = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+    if (dMatch && dMatch[1]) return dMatch[1];
+    const idMatch = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+    if (idMatch && idMatch[1]) return idMatch[1];
+    return "";
+  }
+
+  function buildRemoteMediaPreviewHtml(url, rawText, msgObj) {
+    if (!url) return "";
+    const cleanUrl = url.replace(/[)"'<>]+$/g, "");
+    const driveId = extractDriveFileId(cleanUrl);
+    const isAudioHint = /\.(mp3|wav|m4a|ogg|aac)/i.test(rawText || "") ||
+      (msgObj && msgObj.mimeType && String(msgObj.mimeType).startsWith("audio/"));
+
+    if (driveId) {
+      if (isAudioHint) {
+        return buildVoicePlayerHtml(`https://drive.google.com/uc?export=download&id=${driveId}`, cleanUrl);
+      }
+      const thumbUrl = `https://drive.google.com/thumbnail?id=${driveId}&sz=w1000`;
+      return `<div class="chat-media-wrap"><img src="${thumbUrl}" alt="檔案預覽" class="chat-media-img" onclick="openMediaLightbox(this.src)" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex';"><a href="${cleanUrl}" target="_blank" rel="noopener noreferrer" class="chat-file-card" style="display:none;">↗ 開啟雲端檔案</a></div>`;
+    }
+    if (/^data:image\/|\.(jpg|jpeg|png|gif|webp|bmp)(\?.*)?$/i.test(cleanUrl) || cleanUrl.includes("lh3.googleusercontent.com")) {
+      return `<div class="chat-media-wrap"><img src="${cleanUrl}" alt="圖片預覽" class="chat-media-img" onclick="openMediaLightbox(this.src)"></div>`;
+    }
+    if (/\.(mp4|webm|mov)(\?.*)?$/i.test(cleanUrl)) {
+      return `<div class="chat-media-wrap"><video src="${cleanUrl}" controls class="chat-media-video"></video></div>`;
+    }
+    if (/^data:audio\/|\.(mp3|wav|m4a|ogg|aac)(\?.*)?$/i.test(cleanUrl)) {
+      return buildVoicePlayerHtml(cleanUrl, cleanUrl);
+    }
+    return `<div class="chat-media-wrap"><a href="${cleanUrl}" target="_blank" rel="noopener noreferrer" class="chat-file-card">↗ 開啟附件連結</a></div>`;
+  }
+
+  function isMultimediaUrl(url) {
+    if (!url) return false;
+    const cleanUrl = url.replace(/[)"'<>]+$/g, "");
+    if (extractDriveFileId(cleanUrl)) return true;
+    if (/^data:(image|audio|video)\/|\.(jpg|jpeg|png|gif|webp|bmp|mp4|webm|mov|mp3|wav|m4a|ogg|aac)(\?.*)?$/i.test(cleanUrl)) return true;
+    if (cleanUrl.includes("lh3.googleusercontent.com")) return true;
+    return false;
+  }
+
+  function isMultimediaUrl(url) {
+    if (!url) return false;
+    const cleanUrl = url.replace(/[)"'<>]+$/g, "");
+    if (extractDriveFileId(cleanUrl)) return true;
+    if (/^data:(image|audio|video)\/|\.(jpg|jpeg|png|gif|webp|bmp|mp4|webm|mov|mp3|wav|m4a|ogg|aac)(\?.*)?$/i.test(cleanUrl)) return true;
+    if (cleanUrl.includes("lh3.googleusercontent.com")) return true;
+    return false;
+  }
+
+  function formatMessageWithPreview(rawText, msgObj) {
+    const rawStr = String(rawText || "");
+    const urls = new Set();
+    const textMatches = rawStr.match(/https?:\/\/[^\s<>"']+/g) || [];
+    textMatches.forEach(u => urls.add(u.replace(/[)"'<>]+$/g, "")));
+
+    if (msgObj) {
+      ['fileUrl', 'mediaUrl', 'imageUrl', 'attachmentUrl'].forEach(k => {
+        if (msgObj[k] && typeof msgObj[k] === 'string') {
+          urls.add(msgObj[k].trim());
+        }
+      });
+    }
+
+    let mediaHtml = "";
+    let hasMultimedia = false;
+    urls.forEach(u => {
+      if (isMultimediaUrl(u)) hasMultimedia = true;
+      mediaHtml += buildRemoteMediaPreviewHtml(u, rawStr, msgObj);
+    });
+
+    
+    if (hasMultimedia) {
+      return mediaHtml;
+    }
+
+    return stripMarkdown(rawStr) + mediaHtml;
+  }
+
 
   function handleFileUpload(event) {
     const file = event.target.files[0];
@@ -579,29 +1127,234 @@
 
     const reader = new FileReader();
     reader.onload = function(e) {
+      pendingFilePreviewUrl = e.target.result;
       pendingFileObj = {
         fileName: file.name,
         mimeType: file.type,
         base64: e.target.result.split(',')[1]
       };
+      document.querySelectorAll('.file-preview-area').forEach(area => {
+        let thumbBox = area.querySelector('.pending-thumb-box');
+        if (!thumbBox) {
+          thumbBox = document.createElement('div');
+          thumbBox.className = 'pending-thumb-box';
+          area.appendChild(thumbBox);
+        }
+        if (file.type && file.type.startsWith('image/')) {
+          thumbBox.innerHTML = `<img src="${pendingFilePreviewUrl}" alt="${file.name}" class="pending-thumb-img" onclick="openMediaLightbox(this.src)">`;
+        } else if ((file.type && file.type.startsWith('audio/')) || /\.(mp3|wav|m4a|ogg|aac)$/i.test(file.name)) {
+          thumbBox.innerHTML = buildVoicePlayerHtml(pendingFilePreviewUrl, "");
+        } else {
+          thumbBox.innerHTML = '';
+        }
+      });
     };
     reader.readAsDataURL(file);
   }
 
+
   function clearSelectedFile() {
     pendingFileObj = null;
+    pendingFilePreviewUrl = "";
     document.getElementById('global-file-upload').value = "";
-    document.querySelectorAll('.file-preview-area').forEach(el => el.style.display = 'none');
+    document.querySelectorAll('.file-preview-area').forEach(el => {
+      el.style.display = 'none';
+      const thumbBox = el.querySelector('.pending-thumb-box');
+      if (thumbBox) thumbBox.remove();
+    });
+  }
+
+  let mediaRecorder = null;
+  let audioChunks = [];
+  let recordingStream = null;
+  let recordingTimer = null;
+  let recordingSeconds = 0;
+  let activeMicBtn = null;
+  let activeRecordBar = null;
+  let isRecordingCanceled = false;
+
+  const recPauseSvg = '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" stroke="none"><rect x="6" y="4" width="4" height="16" rx="1"></rect><rect x="14" y="4" width="4" height="16" rx="1"></rect></svg>';
+  const recResumeSvg = '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" stroke="none"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg>';
+  const recStopSvg = '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" stroke="none"><rect x="5" y="5" width="14" height="14" rx="2"></rect></svg>';
+  const recCancelSvg = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
+
+  function toggleVoiceRecording(btn) {
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      stopVoiceRecording();
+      return;
+    }
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      alert("您的瀏覽器或目前環境不支援麥克風錄音功能。");
+      return;
+    }
+
+    navigator.mediaDevices.getUserMedia({ audio: true })
+      .then(stream => {
+        recordingStream = stream;
+        audioChunks = [];
+        recordingSeconds = 0;
+        isRecordingCanceled = false;
+        activeMicBtn = btn;
+
+        let mimeType = 'audio/webm';
+        if (typeof MediaRecorder !== 'undefined') {
+          if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+            mimeType = 'audio/webm;codecs=opus';
+          } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+            mimeType = 'audio/mp4';
+          }
+        }
+
+        mediaRecorder = new MediaRecorder(stream, { mimeType: mimeType });
+        mediaRecorder.ondataavailable = e => {
+          if (e.data && e.data.size > 0) audioChunks.push(e.data);
+        };
+
+        mediaRecorder.onstop = () => {
+          cleanupRecordingUi();
+          if (isRecordingCanceled || audioChunks.length === 0) return;
+
+          const cleanMime = (mediaRecorder.mimeType || 'audio/webm').split(';')[0];
+          const ext = cleanMime.includes('mp4') ? 'mp4' : 'webm';
+          const blob = new Blob(audioChunks, { type: cleanMime });
+          const now = new Date();
+          const fileName = `voice_${now.getHours()}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}.${ext}`;
+
+          const reader = new FileReader();
+          reader.onload = function(ev) {
+            pendingFilePreviewUrl = ev.target.result;
+            pendingFileObj = {
+              fileName: fileName,
+              mimeType: cleanMime,
+              base64: ev.target.result.split(',')[1]
+            };
+            document.querySelectorAll('.file-preview-area').forEach(area => {
+              area.style.display = 'block';
+              const nameEl = area.querySelector('.file-name-display');
+              if (nameEl) nameEl.innerText = fileName;
+              let thumbBox = area.querySelector('.pending-thumb-box');
+              if (!thumbBox) {
+                thumbBox = document.createElement('div');
+                thumbBox.className = 'pending-thumb-box';
+                area.appendChild(thumbBox);
+              }
+              thumbBox.innerHTML = buildVoicePlayerHtml(pendingFilePreviewUrl, "");
+            });
+          };
+          reader.readAsDataURL(blob);
+        };
+
+        mediaRecorder.start(200);
+        btn.classList.add('recording');
+        showVoiceRecordBar(btn);
+
+        recordingTimer = setInterval(() => {
+          if (mediaRecorder && mediaRecorder.state === 'recording') {
+            recordingSeconds++;
+            updateRecordBarTime();
+          }
+        }, 1000);
+      })
+      .catch(err => {
+        console.error("無法開啟麥克風:", err);
+        alert("無法存取麥克風，請確認瀏覽器已允許麥克風權限。");
+      });
+  }
+
+  function showVoiceRecordBar(btn) {
+    if (activeRecordBar) activeRecordBar.remove();
+    const chatArea = btn.closest('.chat-area');
+    const inputArea = btn.closest('.chat-input-area');
+    if (!chatArea || !inputArea) return;
+
+    const bar = document.createElement('div');
+    bar.className = 'voice-record-bar';
+    bar.innerHTML = `
+      <div class="voice-record-status">
+        <span class="voice-record-dot"></span>
+        <span class="voice-record-label">錄音中</span>
+        <span class="voice-record-timer">0:00</span>
+      </div>
+      <div class="voice-record-actions">
+        <button type="button" class="voice-ctrl-btn" onclick="pauseOrResumeRecording(this)" title="暫停">${recPauseSvg}</button>
+        <button type="button" class="voice-ctrl-btn stop" onclick="stopVoiceRecording()" title="停止並準備發送">${recStopSvg}</button>
+        <button type="button" class="voice-ctrl-btn" onclick="cancelVoiceRecording()" title="取消錄音">${recCancelSvg}</button>
+      </div>
+    `;
+    chatArea.insertBefore(bar, inputArea);
+    activeRecordBar = bar;
+  }
+
+  function updateRecordBarTime() {
+    if (!activeRecordBar) return;
+    const timerEl = activeRecordBar.querySelector('.voice-record-timer');
+    if (timerEl) timerEl.innerText = formatAudioTime(recordingSeconds);
+  }
+
+  function pauseOrResumeRecording(ctrlBtn) {
+    if (!mediaRecorder) return;
+    const dot = activeRecordBar ? activeRecordBar.querySelector('.voice-record-dot') : null;
+    const label = activeRecordBar ? activeRecordBar.querySelector('.voice-record-label') : null;
+
+    if (mediaRecorder.state === 'recording') {
+      mediaRecorder.pause();
+      ctrlBtn.innerHTML = recResumeSvg;
+      ctrlBtn.title = "繼續";
+      if (dot) dot.classList.add('paused');
+      if (label) label.innerText = "已暫停";
+    } else if (mediaRecorder.state === 'paused') {
+      mediaRecorder.resume();
+      ctrlBtn.innerHTML = recPauseSvg;
+      ctrlBtn.title = "暫停";
+      if (dot) dot.classList.remove('paused');
+      if (label) label.innerText = "錄音中";
+    }
+  }
+
+  function stopVoiceRecording() {
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      mediaRecorder.stop();
+    }
+  }
+
+  function cancelVoiceRecording() {
+    isRecordingCanceled = true;
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      mediaRecorder.stop();
+    } else {
+      cleanupRecordingUi();
+    }
+  }
+
+  function cleanupRecordingUi() {
+    if (recordingTimer) {
+      clearInterval(recordingTimer);
+      recordingTimer = null;
+    }
+    if (recordingStream) {
+      recordingStream.getTracks().forEach(t => t.stop());
+      recordingStream = null;
+    }
+    if (activeMicBtn) {
+      activeMicBtn.classList.remove('recording');
+      activeMicBtn = null;
+    }
+    if (activeRecordBar) {
+      activeRecordBar.remove();
+      activeRecordBar = null;
+    }
   }
  
   let currentUserEmail = "";
   let currentUserName = "";
   let currentUserRole = "";
 
+
   function performLogin() {
     const name = document.getElementById('login-name').value.trim();
     const email = document.getElementById('login-email').value.trim();
     const msgEl = document.getElementById('login-msg');
+
 
     if(!name || !email) {
       msgEl.innerText = "請完整填寫稱呼與 Email。";
@@ -612,8 +1365,10 @@
       return;
     }
 
+
     msgEl.innerText = "驗證中，請稍候...";
     document.getElementById('login-btn').disabled = true;
+
 
     requestBackend({ action: 'verify_login', email: email, name: name })
     .then(res => {
@@ -621,18 +1376,20 @@
         currentUserName = res.name;
         currentUserRole = res.role;
 
-        localStorage.setItem('growthx_user_email', currentUserEmail);
-        localStorage.setItem('growthx_user_name', currentUserName);
-        localStorage.setItem('growthx_user_role', currentUserRole);
 
-        document.getElementById('login-overlay').style.display = 'none';
+      localStorage.setItem('growthx_user_email', currentUserEmail);
+      localStorage.setItem('growthx_user_name', currentUserName);
+      localStorage.setItem('growthx_user_role', currentUserRole);
 
-        if(currentUserRole === 'boss') {
-          document.getElementById('tab-navbar').style.display = 'flex';
-          switchTab('admin');
-          fetchDataBundle(false);
-          pollingInterval = setInterval(() => { fetchDataBundle(true); }, 5000);
-        } else {
+      document.getElementById('login-overlay').style.display = 'none';
+
+      if(currentUserRole === 'boss') {
+        document.getElementById('tab-navbar').style.display = 'flex';
+        switchTab('admin');
+        fetchDataBundle(false);
+        loadWarRoomHistory();
+        pollingInterval = setInterval(() => { fetchDataBundle(true); }, 5000);
+      } else {
           document.getElementById('tab-navbar').style.display = 'none';
           document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active-tab'));
           document.getElementById('view-client').classList.add('active-tab');
@@ -649,6 +1406,7 @@
         console.error(err);
     });
   }
+
 
   function loadClientHistory(email) {
     requestBackend({ action: 'get_admin_data' })
@@ -673,9 +1431,11 @@
                 lastClientDate = timeData.date;
             }
 
+
             const wrapper = document.createElement('div');
             const isRight = (msg.sender === 'ai');
             wrapper.className = 'msg-wrapper ' + (isRight ? 'right' : 'left');
+
 
             const bubble = document.createElement('div');
             bubble.classList.add('msg-bubble');
@@ -684,28 +1444,75 @@
             } else {
                 bubble.classList.add('msg-ai');
             }
-            bubble.innerHTML = stripMarkdown(timeData.text).replace(/\[真人客服\]/g, '');
+            bubble.innerHTML = formatMessageWithPreview(timeData.text, msg).replace(/\[真人客服\]/g, '');
            
             const timeDiv = document.createElement('div');
             timeDiv.className = 'msg-time';
             timeDiv.innerText = timeData.time;
+
 
             wrapper.appendChild(bubble);
             wrapper.appendChild(timeDiv);
             msgContainer.appendChild(wrapper);
         });
         clientScrollToBottom();
-    })
-    .catch(err => console.error(err));
-  }
+  })
+  .catch(err => console.error(err));
+}
 
-  function switchTab(tabId) {
+function loadWarRoomHistory() {
+  requestBackend({ action: 'get_warroom_history' })
+  .then(history => {
+    const msgContainer = document.getElementById('warroom-chat-messages');
+    msgContainer.innerHTML = '';
+    lastWarRoomDate = "";
+    if(history.length === 0) {
+        msgContainer.innerHTML = '<div style="padding: 20px; text-align: center; color: #888; margin-top: 50px;">歡迎來到企業戰情室。<br><br>系統大腦已準備就緒，您可以隨時請我分析「客服情報」或提供高商業價值的決策建議。</div>';
+        return;
+    }
+    history.forEach(msg => {
+        const timeData = processMessageContent(msg.text);
+        if (timeData.date !== lastWarRoomDate) {
+            const dateDiv = document.createElement('div');
+            dateDiv.className = 'date-divider';
+            dateDiv.innerHTML = `<span>${timeData.date}</span>`;
+            msgContainer.appendChild(dateDiv);
+            lastWarRoomDate = timeData.date;
+        }
+        const wrapper = document.createElement('div');
+        const isAdvisor = (msg.sender === 'advisor');
+        wrapper.className = 'msg-wrapper ' + (isAdvisor ? 'left' : 'right');
+
+        const bubble = document.createElement('div');
+        bubble.classList.add('msg-bubble', isAdvisor ? 'msg-warroom' : 'msg-admin');
+        
+        if (isAdvisor) {
+            bubble.innerHTML = `<strong>${advisorIcon}戰情顧問：</strong><br>` + formatMessageWithPreview(timeData.text, msg);
+        } else {
+            bubble.innerHTML = formatMessageWithPreview(timeData.text, msg);
+        }
+
+        const timeDiv = document.createElement('div');
+        timeDiv.className = 'msg-time';
+        timeDiv.innerText = timeData.time;
+
+        wrapper.appendChild(bubble);
+        wrapper.appendChild(timeDiv);
+        msgContainer.appendChild(wrapper);
+    });
+    warRoomScrollToBottom();
+  })
+  .catch(err => console.error("戰情室歷史載入失敗", err));
+}
+
+function switchTab(tabId) {
     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(view => view.classList.remove('active-tab'));
    
     document.getElementById('btn-' + tabId).classList.add('active');
     document.getElementById('view-' + tabId).classList.add('active-tab');
   }
+
 
   let selectedUserId = null;
   let selectedUserRowId = null;
@@ -715,15 +1522,24 @@
   let localUserCache = [];
   let readHistoryLength = {};
 
+
   function fetchDataBundle(isSilent) {
     requestBackend({ action: 'get_admin_data' })
     .then(bundle => handleDataBundle(bundle, isSilent))
     .catch(err => console.error("資料獲取失敗:", err));
   }
 
+
   function handleDataBundle(bundle, isSilent) {
     localUserCache = bundle.users || [];
     const histories = bundle.histories || {};
+    const serverReadCounts = bundle.readCounts || {};
+    Object.keys(serverReadCounts).forEach(uid => {
+      const serverLen = parseInt(serverReadCounts[uid], 10) || 0;
+      if (!readHistoryLength[uid] || serverLen > readHistoryLength[uid]) {
+        readHistoryLength[uid] = serverLen;
+      }
+    });
    
     if (pendingRequests > 0 && selectedUserId) {
         Object.keys(histories).forEach(uid => {
@@ -737,8 +1553,17 @@
        
         localChatCache = histories;
 
+
         if (selectedUserId) {
-          readHistoryLength[selectedUserId] = (localChatCache[selectedUserId] || []).length;
+          const latestLen = (localChatCache[selectedUserId] || []).length;
+          if (latestLen > (readHistoryLength[selectedUserId] || 0)) {
+            readHistoryLength[selectedUserId] = latestLen;
+            requestBackend({
+              action: 'mark_chat_read',
+              userId: selectedUserId,
+              readCount: latestLen
+            }).catch(err => console.error("即時已讀同步失敗:", err));
+          }
          
           if (isSilent && prevStr === newStr) {
               renderUserList();
@@ -751,6 +1576,7 @@
     renderUserList();
   }
 
+
   function renderUserList() {
     const listEl = document.getElementById('user-list');
     const uniqueUsers = [];
@@ -761,6 +1587,7 @@
         uniqueUsers.push(u);
       }
     });
+
 
     if(uniqueUsers.length === 0) {
         listEl.innerHTML = '<div style="padding: 20px; text-align: center; color: #888;">目前尚無客戶紀錄</div>';
@@ -773,6 +1600,7 @@
       if (u.userId === selectedUserId) userClass += ' active';
       if (u.bookingState === 'booked') userClass += ' state-booked';
       else if (u.bookingState === 'completed') userClass += ' state-completed';
+
 
       const item = document.createElement('div');
       item.className = userClass;
@@ -793,6 +1621,7 @@
         }
       }
 
+
       const infoCol = document.createElement('div');
       infoCol.style.flex = '1';
       infoCol.style.overflow = 'hidden';
@@ -800,10 +1629,12 @@
       infoCol.style.flexDirection = 'column';
       infoCol.style.justifyContent = 'center';
 
+
       const nameSpan = document.createElement('span');
       nameSpan.className = 'user-name';
       nameSpan.innerText = u.userName || u.userId;
       infoCol.appendChild(nameSpan);
+
 
       if (u.labels && u.labels.length > 0) {
         const labelsDiv = document.createElement('div');
@@ -832,6 +1663,7 @@
         badgesDiv.appendChild(urgentBadge);
       }
 
+
       if (clientCount > 0) {
         const clientBadge = document.createElement('div');
         clientBadge.className = 'badge badge-client';
@@ -848,20 +1680,30 @@
         badgesDiv.appendChild(aiBadge);
       }
 
+
       item.appendChild(infoCol);
       item.appendChild(badgesDiv);
+
 
       item.onclick = () => selectUser(u.userId, u.userName || u.userId, u._rowId);
       listEl.appendChild(item);
     });
   }
 
+
   function selectUser(userId, userName, rowId) {
     selectedUserId = userId;
     selectedUserRowId = rowId || null;
     pendingRequests = 0;
-    readHistoryLength[userId] = (localChatCache[userId] || []).length;
+    const currentLen = (localChatCache[userId] || []).length;
+    readHistoryLength[userId] = currentLen;
     document.getElementById('chat-title').innerText = userName + " 的對話";
+
+    requestBackend({
+      action: 'mark_chat_read',
+      userId: userId,
+      readCount: currentLen
+    }).catch(err => console.error("已讀狀態同步失敗:", err));
    
     if (window.innerWidth <= 768) {
       document.getElementById('sidebar').classList.add('hidden');
@@ -871,9 +1713,11 @@
     renderUserList();
   }
 
+
   function backToList() {
     document.getElementById('sidebar').classList.remove('hidden');
   }
+
 
   function renderChatHistory(history) {
     const msgContainer = document.getElementById('chat-messages');
@@ -882,10 +1726,12 @@
     msgContainer.innerHTML = '';
     lastAdminDate = "";
 
+
     if(history.length === 0) {
         msgContainer.innerHTML = '<div style="text-align:center; color:#999; margin-top:20px;">尚無對話紀錄</div>';
         return;
     }
+
 
     history.forEach(msg => {
       const timeData = processMessageContent(msg.text);
@@ -897,9 +1743,11 @@
           lastAdminDate = timeData.date;
       }
 
+
       const isRight = (msg.sender === 'ai' || msg.sender === 'admin');
       const wrapper = document.createElement('div');
       wrapper.className = 'msg-wrapper ' + (isRight ? 'right' : 'left');
+
 
       const bubble = document.createElement('div');
       bubble.classList.add('msg-bubble');
@@ -912,7 +1760,7 @@
         bubble.classList.add('msg-admin');
       }
      
-      let formattedText = stripMarkdown(timeData.text);
+      let formattedText = formatMessageWithPreview(timeData.text, msg);
       formattedText = formattedText.replace(/\[真人客服\]/g, `<strong>${adminIcon}真人接管回覆：</strong><br>`);
      
       bubble.innerHTML = formattedText;
@@ -921,13 +1769,16 @@
       timeDiv.className = 'msg-time';
       timeDiv.innerText = timeData.time;
 
+
       wrapper.appendChild(bubble);
       wrapper.appendChild(timeDiv);
       msgContainer.appendChild(wrapper);
     });
 
+
     if(isAtBottom) scrollToBottom();
   }
+
 
   function handleKeyPress(event) {
     if (event.isComposing || event.keyCode === 229) return;
@@ -937,13 +1788,16 @@
     }
   }
 
+
   function sendMessage() {
     if (!selectedUserId) return;
+
 
     const inputEl = document.getElementById('chat-input');
     const text = inputEl.value.trim();
    
     if (!text && !pendingFileObj) return;
+
 
     const msgContainer = document.getElementById('chat-messages');
    
@@ -956,20 +1810,26 @@
         lastAdminDate = timeData.date;
     }
 
+
     const wrapper = document.createElement('div');
     wrapper.className = 'msg-wrapper right';
+
 
     const bubble = document.createElement('div');
     bubble.classList.add('msg-bubble', 'msg-admin');
    
-    let displayMsg = text || "[傳送了檔案給客戶]";
-    if (pendingFileObj) displayMsg += `<br><i>📎 [附加檔案：${pendingFileObj.fileName}]</i>`;
+    let displayMsg = text;
+    let localPreview = "";
+    if (pendingFileObj) {
+      localPreview = buildLocalFilePreviewHtml(pendingFileObj, pendingFilePreviewUrl);
+    }
 
-    bubble.innerHTML = `<strong>${adminIcon}真人接管回覆：</strong><br>` + stripMarkdown(displayMsg);
+    bubble.innerHTML = `<strong>${adminIcon}真人接管回覆：</strong><br>` + (displayMsg ? stripMarkdown(displayMsg) : "") + localPreview;
    
     const timeDiv = document.createElement('div');
     timeDiv.className = 'msg-time';
     timeDiv.innerText = timeData.time;
+
 
     wrapper.appendChild(bubble);
     wrapper.appendChild(timeDiv);
@@ -981,6 +1841,7 @@
     localChatCache[selectedUserId].push({ sender: 'admin', text: displayMsg });
     readHistoryLength[selectedUserId] = localChatCache[selectedUserId].length;
 
+
     const payload = {
        action: 'send_admin_override',
        userId: selectedUserId,
@@ -988,11 +1849,14 @@
        text: displayMsg
     };
 
+
     inputEl.value = "";
     inputEl.focus();
     clearSelectedFile();
 
+
     pendingRequests++;
+
 
     requestBackend(payload)
     .then(res => {
@@ -1006,10 +1870,12 @@
     });
   }
 
+
   function scrollToBottom() {
     const msgContainer = document.getElementById('chat-messages');
     msgContainer.scrollTop = msgContainer.scrollHeight;
   }
+
 
   // 客戶端發送與防抖邏輯
   function handleClientKeyPress(event) {
@@ -1020,11 +1886,13 @@
     }
   }
 
+
   function sendClientMessage() {
     const inputEl = document.getElementById('client-chat-input');
     const text = inputEl.value.trim();
    
     if (!text && !pendingFileObj) return;
+
 
     const msgContainer = document.getElementById('client-chat-messages');
     const timeData = processMessageContent("");
@@ -1036,20 +1904,26 @@
         lastClientDate = timeData.date;
     }
 
+
     const wrapper = document.createElement('div');
     wrapper.className = 'msg-wrapper left';
+
 
     const bubble = document.createElement('div');
     bubble.classList.add('msg-bubble', 'msg-client');
    
     let displayMsg = text;
-    if (pendingFileObj) displayMsg += (text ? `<br>` : "") + `<i>📎 [已附加檔案：${pendingFileObj.fileName}]</i>`;
-   
-    bubble.innerHTML = stripMarkdown(displayMsg);
+    let localPreview = "";
+    if (pendingFileObj) {
+      localPreview = buildLocalFilePreviewHtml(pendingFileObj, pendingFilePreviewUrl);
+    }
+
+    bubble.innerHTML = (displayMsg ? stripMarkdown(displayMsg) : "") + localPreview;
    
     const timeDiv = document.createElement('div');
     timeDiv.className = 'msg-time';
     timeDiv.innerText = timeData.time;
+
 
     wrapper.appendChild(bubble);
     wrapper.appendChild(timeDiv);
@@ -1064,11 +1938,14 @@
       fileObj: pendingFileObj
     };
 
+
     inputEl.value = "";
     clearSelectedFile();
     inputEl.focus();
 
+
     clientPendingCount++;
+
 
     clearTimeout(clientThinkingTimer);
     clientThinkingTimer = setTimeout(() => {
@@ -1078,6 +1955,7 @@
             pendingWrapper.className = 'msg-wrapper right';
             pendingWrapper.id = 'client-pending-wrapper';
 
+
             const pendingBubble = document.createElement('div');
             pendingBubble.classList.add('msg-bubble', 'msg-ai', 'msg-pending');
             pendingBubble.innerHTML = 'AI 正在思考與解析內容中...';
@@ -1086,6 +1964,7 @@
             pendingTime.className = 'msg-time';
             pendingTime.innerText = processMessageContent("").time;
 
+
             pendingWrapper.appendChild(pendingBubble);
             pendingWrapper.appendChild(pendingTime);
             msgContainer.appendChild(pendingWrapper);
@@ -1093,15 +1972,18 @@
         }
     }, 2000);
 
+
     requestBackend(payload)
     .then(data => {
         clientPendingCount--;
        
         if (data && data.isSilent) return;
 
+
         clearTimeout(clientThinkingTimer);
         const loadingEl = document.getElementById('client-pending-wrapper');
         if (loadingEl) loadingEl.remove();
+
 
         const replyTimeData = processMessageContent((data && data.reply) ? data.reply : "");
         if (replyTimeData.date !== lastClientDate) {
@@ -1112,16 +1994,19 @@
             lastClientDate = replyTimeData.date;
         }
 
+
         const repWrapper = document.createElement('div');
         repWrapper.className = 'msg-wrapper right';
 
+
         const aiBubble = document.createElement('div');
         aiBubble.classList.add('msg-bubble', 'msg-ai');
-        aiBubble.innerHTML = stripMarkdown(replyTimeData.text);
+        aiBubble.innerHTML = formatMessageWithPreview(replyTimeData.text, data);
        
         const repTime = document.createElement('div');
         repTime.className = 'msg-time';
         repTime.innerText = replyTimeData.time;
+
 
         repWrapper.appendChild(aiBubble);
         repWrapper.appendChild(repTime);
@@ -1141,10 +2026,12 @@
     });
   }
 
+
   function clientScrollToBottom() {
     const msgContainer = document.getElementById('client-chat-messages');
     msgContainer.scrollTop = msgContainer.scrollHeight;
   }
+
 
   // 老闆戰情室邏輯
   function handleWarRoomKeyPress(event) {
@@ -1155,11 +2042,13 @@
     }
   }
 
+
   function sendWarRoomMessage() {
     const inputEl = document.getElementById('warroom-chat-input');
     const text = inputEl.value.trim();
    
     if (!text && !pendingFileObj) return;
+
 
     const msgContainer = document.getElementById('warroom-chat-messages');
     const timeData = processMessageContent("");
@@ -1171,25 +2060,32 @@
         lastWarRoomDate = timeData.date;
     }
 
+
     const wrapper = document.createElement('div');
     wrapper.className = 'msg-wrapper right';
+
 
     const userBubble = document.createElement('div');
     userBubble.classList.add('msg-bubble', 'msg-admin');
    
     let displayMsg = text;
-    if (pendingFileObj) displayMsg += (text ? `<br>` : "") + `<i>📎 [已附加檔案：${pendingFileObj.fileName}]</i>`;
-   
-    userBubble.innerHTML = stripMarkdown(displayMsg);
+    let localPreview = "";
+    if (pendingFileObj) {
+      localPreview = buildLocalFilePreviewHtml(pendingFileObj, pendingFilePreviewUrl);
+    }
+
+    userBubble.innerHTML = (displayMsg ? stripMarkdown(displayMsg) : "") + localPreview;
    
     const timeDiv = document.createElement('div');
     timeDiv.className = 'msg-time';
     timeDiv.innerText = timeData.time;
 
+
     wrapper.appendChild(userBubble);
     wrapper.appendChild(timeDiv);
     msgContainer.appendChild(wrapper);
     warRoomScrollToBottom();
+
 
     const payload = {
       action: 'war_room_chat',
@@ -1197,11 +2093,14 @@
       fileObj: pendingFileObj
     };
 
+
     inputEl.value = "";
     clearSelectedFile();
     inputEl.focus();
 
+
     warroomPendingCount++;
+
 
     clearTimeout(warroomThinkingTimer);
     warroomThinkingTimer = setTimeout(() => {
@@ -1211,6 +2110,7 @@
             pendingWrapper.className = 'msg-wrapper left';
             pendingWrapper.id = 'warroom-pending-wrapper';
 
+
             const pendingBubble = document.createElement('div');
             pendingBubble.classList.add('msg-bubble', 'msg-warroom', 'msg-pending');
             pendingBubble.innerHTML = '戰情室核心正在分析龐大資料與運算決策...';
@@ -1219,6 +2119,7 @@
             pendingTime.className = 'msg-time';
             pendingTime.innerText = processMessageContent("").time;
 
+
             pendingWrapper.appendChild(pendingBubble);
             pendingWrapper.appendChild(pendingTime);
             msgContainer.appendChild(pendingWrapper);
@@ -1226,15 +2127,18 @@
         }
     }, 2000);
 
+
     requestBackend(payload)
     .then(data => {
         warroomPendingCount--;
        
         if (data && data.isSilent) return;
 
+
         clearTimeout(warroomThinkingTimer);
         const loadingEl = document.getElementById('warroom-pending-wrapper');
         if (loadingEl) loadingEl.remove();
+
 
         const replyTimeData = processMessageContent((data && data.reply) ? data.reply : "");
         if (replyTimeData.date !== lastWarRoomDate) {
@@ -1245,16 +2149,19 @@
             lastWarRoomDate = replyTimeData.date;
         }
 
+
         const repWrapper = document.createElement('div');
         repWrapper.className = 'msg-wrapper left';
 
+
         const aiBubble = document.createElement('div');
         aiBubble.classList.add('msg-bubble', 'msg-warroom');
-        aiBubble.innerHTML = `<strong>${advisorIcon}戰情顧問：</strong><br>` + stripMarkdown(replyTimeData.text);
+        aiBubble.innerHTML = `<strong>${advisorIcon}戰情顧問：</strong><br>` + formatMessageWithPreview(replyTimeData.text, data);
        
         const repTime = document.createElement('div');
         repTime.className = 'msg-time';
         repTime.innerText = replyTimeData.time;
+
 
         repWrapper.appendChild(aiBubble);
         repWrapper.appendChild(repTime);
@@ -1273,10 +2180,26 @@
     });
   }
 
+
   function warRoomScrollToBottom() {
     const msgContainer = document.getElementById('warroom-chat-messages');
     msgContainer.scrollTop = msgContainer.scrollHeight;
   }
+  
+  // 自動將現有 SVG 替換為極簡質感線條圖標 (Feather Icons)
+  document.addEventListener('DOMContentLoaded', () => {
+    const setLineIcon = (selector, pathHtml) => {
+      document.querySelectorAll(selector).forEach(el => {
+        el.innerHTML = pathHtml;
+        el.setAttribute('viewBox', '0 0 24 24');
+      });
+    };
+    // 附件/多媒體/語音/發送 等替換為極簡線條
+    setLineIcon('.icon-btn[title="多媒體"] svg', '<rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline>');
+    setLineIcon('.icon-btn[title="文件"] svg', '<path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline>');
+    setLineIcon('.icon-btn[title="語音"] svg', '<path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line>');
+    setLineIcon('.send-btn svg', '<line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>');
+  });
 </script>
 </body>
 </html>
